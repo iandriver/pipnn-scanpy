@@ -1,0 +1,23 @@
+# Rust
+/target
+**/*.rs.bk
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Paper (cite arXiv:2602.21247 instead of redistributing)
+PiPNN.pdf
+/pages/
+
+# Data
+*.h5ad
+*.npy
+
+# OS
+.DS_Store

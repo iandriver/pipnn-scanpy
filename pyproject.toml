@@ -1,0 +1,28 @@
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "pipnn"
+version = "0.1.0"
+description = "Fast graph-based nearest-neighbor indexing (PiPNN) for single-cell / scanpy data"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "PiPNN module" }]
+dependencies = [
+    "numpy>=1.23",
+    "scipy>=1.9",
+    "scikit-learn>=1.2",
+]
+
+[project.optional-dependencies]
+scanpy = ["scanpy>=1.10", "anndata>=0.9"]
+test = ["pytest>=7", "scanpy>=1.10", "pynndescent>=0.5"]
+
+[tool.maturin]
+# Mixed Rust/Python layout: pure-Python package lives under python/pipnn,
+# the compiled extension is pipnn._pipnn.
+python-source = "python"
+module-name = "pipnn._pipnn"
+features = ["pyo3/extension-module"]

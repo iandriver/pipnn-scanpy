@@ -1,0 +1,26 @@
+[package]
+name = "pipnn"
+version = "0.1.0"
+edition = "2021"
+description = "PiPNN: ultra-scalable graph-based nearest neighbor indexing for single-cell data"
+license = "MIT"
+
+# The compiled Python extension module must be named `_pipnn` (imported as pipnn._pipnn).
+[lib]
+name = "_pipnn"
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[dependencies]
+pipnn-core = { path = "crates/pipnn-core" }
+pyo3 = { version = "0.27", features = ["extension-module", "abi3-py39"] }
+numpy = "0.27"
+rayon = "1.10"
+
+[workspace]
+members = ["crates/pipnn-core"]
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1

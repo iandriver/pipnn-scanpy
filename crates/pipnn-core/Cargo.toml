@@ -1,0 +1,22 @@
+[package]
+name = "pipnn-core"
+version = "0.1.0"
+edition = "2021"
+description = "Core PiPNN algorithm: partitioning, HashPrune, RobustPrune, BeamSearch"
+license = "MIT"
+
+[dependencies]
+rayon = "1.10"
+matrixmultiply = "0.3"
+half = "2.4"
+rand = "0.8"
+rand_chacha = "0.3"
+
+[dev-dependencies]
+approx = "0.5"
+
+[features]
+default = []
+# Optional BLAS-backed GEMM (requires a system/bundled BLAS). Off by default so
+# the published wheels stay self-contained.
+gemm-blas = []
