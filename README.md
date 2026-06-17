@@ -62,19 +62,54 @@ for memory, or set `n_jobs` to bound thread-level transient memory.
 
 ## Comparison notebook
 
-`notebooks/pipnn_vs_pynndescent.ipynb` compares PiPNN vs pynndescent vs exact on
-real single-cell data, all through the same `sc.pp.neighbors(transformer=...)`
-hook: build time, recall@k, side-by-side UMAP embeddings, and Leiden clustering
-agreement (ARI). It ships pre-executed with plots. To re-run:
+`notebooks/pipnn_vs_pynndescent.ipynb` compares PiPNN vs pynndescent vs
+[pyglass](https://github.com/zilliztech/pyglass) vs exact on real single-cell
+data, all through the same `sc.pp.neighbors(transformer=...)` hook: build time,
+recall@k, side-by-side UMAP embeddings, and Leiden clustering agreement (ARI). It
+ships pre-executed with plots. To re-run:
 
 ```bash
 .venv/bin/python -m ipykernel install --user --name pipnn-venv --display-name "PiPNN (venv)"
-.venv/bin/jupyter lab notebooks/pipnn_vs_pynndescent.ipynb   # select the "PiPNN (venv)" kernel
+.venv/bin/python build_notebook.py            # regenerate
+.venv/bin/jupyter lab notebooks/pipnn_vs_pynndescent.ipynb   # "PiPNN (venv)" kernel
 ```
 
-Representative result (20k cells, 50 PCs): PiPNN `sc.pp.neighbors` 1.7s vs
-pynndescent 7.7s (**4.7×**), recall@15 0.9997 vs 0.9948, ARI-to-exact 0.94 vs 0.92.
-(`build_notebook.py` regenerates the notebook.)
+Backends are auto-discovered (`bench/bench_lib.py`): any that import are included,
+so `glass` appears wherever pyglass is installed.
+
+### Benchmark methodology (important)
+
+Timings are reported as **cold** (first build) *and* **warm** (median of repeated
+steady-state builds). pynndescent compiles numba kernels on its first call, so its
+cold time is heavily JIT-inflated; the **warm** number is the fair comparison.
+PiPNN (Rust) and glass (C++) have no JIT, so cold ≈ warm.
+
+Representative result (20k cells, 50 PCs, warm): PiPNN `sc.pp.neighbors` ≈ 0.49s
+vs pynndescent ≈ 0.51s (the previously-quoted "4.7×" was almost entirely numba
+JIT — the corrected warm numbers are ~par at this size; PiPNN's advantage grows
+with `n`). recall@15 0.9997 vs 0.9948; ARI-to-exact 0.94 vs 0.92.
+
+### pyglass on Apple Silicon
+
+pyglass ships only manylinux x86_64 wheels (`glassppy`, CPython 3.10) and its
+source assumes x86 intrinsics, so it does not run natively on arm64 macOS.
+`python/pipnn/contrib/glass.py` (`GlassTransformer`) activates automatically
+wherever `glassppy`/`glass` imports.
+
+The bundled `docker/Dockerfile` (linux/amd64, py3.10) builds a complete 4-backend
+image — it installs `glassppy`, compiles `pipnn`, and runs `docker_compare.py`:
+
+```bash
+docker build --platform linux/amd64 -t pipnn-bench -f docker/Dockerfile .
+docker run --platform linux/amd64 --rm -v "$PWD/docker/out:/out" pipnn-bench
+```
+
+**Run this on x86_64 hardware** (a native Linux box or CI). On an arm64 host the
+container runs under qemu emulation, where glass's SIMD/OpenMP code is ~1000×
+slower (an `n=1000` build did not finish in 14 min) — verified that glassppy
+installs and the `GlassTransformer` API matches, but the benchmark is not
+runnable under emulation. The native notebook (PiPNN/pynndescent/exact) is the
+authoritative timing comparison on Apple Silicon.
 
 ## Metrics
 

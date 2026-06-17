@@ -1,68 +1,64 @@
-"""Generate notebooks/pipnn_vs_pynndescent.ipynb."""
+"""Generate notebooks/pipnn_vs_pynndescent.ipynb (backend-list driven)."""
 import nbformat as nbf
 from nbformat.v4 import new_notebook, new_markdown_cell, new_code_cell
 
 nb = new_notebook()
 c = []
+md = lambda s: c.append(new_markdown_cell(s))
+code = lambda s: c.append(new_code_cell(s))
 
 
-def md(s):
-    c.append(new_markdown_cell(s))
+md("""# PiPNN vs. pynndescent vs. pyglass in scanpy
 
+Compares ANN backends for `sc.pp.neighbors`, all plugged in through the *same*
+sklearn `KNeighborsTransformer` hook — so swapping backend is a one-line change:
 
-def code(s):
-    c.append(new_code_cell(s))
+```python
+sc.pp.neighbors(adata, transformer=PiPNNTransformer())        # this repo (Rust, arXiv:2602.21247)
+sc.pp.neighbors(adata, transformer=PyNNDescentTransformer())  # scanpy default
+sc.pp.neighbors(adata, transformer=GlassTransformer())        # pyglass (zilliz HNSW/NSG)
+```
 
+**Timing methodology.** We report **cold** (first build, which for pynndescent
+includes one-time numba JIT compilation) *and* **warm** (median of repeated
+steady-state builds). The warm number is the fair head-to-head; the cold number
+shows the first-call cost a user actually feels.
 
-md("""# PiPNN vs. pynndescent in scanpy
-
-This notebook compares **PiPNN** (the Rust graph-based ANN backend in this repo,
-implementing arXiv:2602.21247 incl. *HashPrune*) against **pynndescent**
-(scanpy's default) on the same single-cell data, both plugged into
-`sc.pp.neighbors` through the *exact same* sklearn `KNeighborsTransformer` hook.
-
-We look at four things:
-1. **How** each backend plugs into scanpy (one identical line — just swap `transformer=`).
-2. **Speed** of building the neighbor graph.
-3. **Recall@k** of each backend vs. an exact brute-force kNN.
-4. **Embeddings**: UMAP side-by-side + Leiden clustering agreement (ARI).
+> `pyglass` has no macOS/arm64 build, so on Apple Silicon the `glass` column is
+> absent here; it appears automatically wherever `glass` imports (x86_64 Linux —
+> see the Docker run in the repo). The methodology and all other backends are
+> unaffected.
 """)
 
 code("""%matplotlib inline
-import time, inspect, warnings
+import sys, time, inspect, warnings
 warnings.filterwarnings("ignore")
+sys.path.insert(0, "../bench")
 import numpy as np
 import scanpy as sc
 import anndata as ad
 import matplotlib.pyplot as plt
-from sklearn.neighbors import NearestNeighbors, KNeighborsTransformer
 from sklearn.metrics import adjusted_rand_score
 
-from pipnn import PiPNNTransformer
-from pynndescent import PyNNDescentTransformer
-
+import bench_lib as bl
 sc.settings.verbosity = 0
 RNG = np.random.default_rng(0)
-K = 15  # neighbors
+K = 15
 print("scanpy", sc.__version__)""")
 
 md("""## 1. Data + preprocessing
 
-We use a real single-cell dataset, subsample for a snappy notebook, and run the
-standard scanpy recipe (normalize → log1p → HVG → scale → PCA-50). The NN graph
-is built on `X_pca` — exactly as in a normal scanpy workflow.
-
-Point `DATA` at any `.h5ad`; set `SUBSAMPLE=None` to use all cells.""")
+Real single-cell data, subsampled for a snappy notebook, run through the standard
+scanpy recipe (normalize → log1p → HVG → scale → PCA-50). Point `DATA` at any
+`.h5ad`; set `SUBSAMPLE=None` for all cells.""")
 
 code("""DATA = "/Users/iandriver/Downloads/SingleRust/data/bench_input.h5ad"
-SUBSAMPLE = 20_000   # cells; None = all
+SUBSAMPLE = 20_000
 
 a = ad.read_h5ad(DATA)
 a.var_names_make_unique()
 if SUBSAMPLE and a.n_obs > SUBSAMPLE:
-    sel = RNG.choice(a.n_obs, SUBSAMPLE, replace=False)
-    a = a[sel].copy()
-
+    a = a[RNG.choice(a.n_obs, SUBSAMPLE, replace=False)].copy()
 sc.pp.filter_genes(a, min_cells=3)
 sc.pp.normalize_total(a, target_sum=1e4)
 sc.pp.log1p(a)
@@ -76,165 +72,128 @@ print(f"{a.n_obs} cells x {X.shape[1]} PCs")""")
 
 md("""## 2. How a custom NN backend plugs into scanpy
 
-Since scanpy ≥1.10, `sc.pp.neighbors` accepts a `transformer=` argument: any
-sklearn-style `KNeighborsTransformer`. scanpy calls `transformer.fit_transform(X)`,
-gets back a sparse `(n, n)` **distance** graph (k+1 entries per row, self first),
-and computes the UMAP connectivities itself. So switching ANN backend is a
-**one-line change** — the rest of the pipeline is identical:
+scanpy (≥1.10) calls `transformer.fit_transform(X)` and expects a sparse `(n,n)`
+**distance** graph (k+1 entries/row, self first); it computes the UMAP
+connectivities itself. So every backend is interchangeable. Here's the PiPNN
+transformer's core — it only returns the kNN distance graph:""")
 
-```python
-sc.pp.neighbors(adata, n_neighbors=15, transformer=PiPNNTransformer())        # PiPNN
-sc.pp.neighbors(adata, n_neighbors=15, transformer=PyNNDescentTransformer())  # pynndescent
-```
-
-Below is the actual PiPNN transformer — note it only returns the kNN distance
-graph; scanpy does the rest.""")
-
-code("""print(inspect.getsource(PiPNNTransformer.fit))
+code("""from pipnn import PiPNNTransformer
 print(inspect.getsource(PiPNNTransformer.transform))""")
 
-md("""## 3. Build the neighbor graph with each backend
+md("""## 3. Build the neighbor graph with each backend (cold vs. warm)
 
-Same data, same `n_neighbors`, three backends: PiPNN, pynndescent, and an exact
-brute-force baseline (sklearn's `KNeighborsTransformer`) for ground truth.""")
+`bench_lib.available_backends` returns every backend whose library is installed
+(`glass` included automatically where importable). We time a **cold** build then
+take the **median of 3 warm** builds.""")
 
-code("""def run_backend(transformer, label):
-    adata = a.copy()
-    t = time.time()
-    sc.pp.neighbors(adata, n_neighbors=K, use_rep="X_pca", transformer=transformer)
-    dt = time.time() - t
-    print(f"{label:12s} sc.pp.neighbors: {dt:6.2f}s   "
-          f"connectivities nnz={adata.obsp['connectivities'].nnz}")
-    return adata, dt
+code("""backends = bl.available_backends(K)
+print("backends:", list(backends.keys()))
 
-res = {}
-res["PiPNN"], t_pip = run_backend(PiPNNTransformer(n_neighbors=K), "PiPNN")
-res["pynndescent"], t_pyn = run_backend(PyNNDescentTransformer(n_neighbors=K, metric="euclidean"), "pynndescent")
-res["exact"], t_exact = run_backend(KNeighborsTransformer(n_neighbors=K, mode="distance"), "exact")
-print(f"\\nPiPNN speedup vs pynndescent: {t_pyn/t_pip:.2f}x")
-print("(pynndescent time includes one-time numba JIT compilation)")""")
+results = {}
+for name, make in backends.items():
+    results[name] = bl.timed_neighbors(make, a, K, repeats=3)
 
-md("""## 4. Recall@k vs. exact
+print(f"\\n{'backend':14s} {'cold(s)':>9s} {'warm(s)':>9s} {'conn_nnz':>10s}")
+for name, r in results.items():
+    print(f"{name:14s} {r['cold']:9.2f} {r['warm_median']:9.2f} {r['conn_nnz']:10d}")
+print("\\n(warm = median steady-state; cold includes numba JIT for pynndescent)")""")
 
-For each backend, what fraction of each cell's true k nearest neighbors does it
-recover? We read the kNN directly from `obsp['distances']`.""")
+md("""## 4. Recall@k vs. exact, and the timing picture
 
-code("""def knn_from_obsp(adata, k):
-    D = adata.obsp["distances"].tocsr()
-    n = D.shape[0]
-    out = np.empty((n, k), dtype=np.int64)
-    for i in range(n):
-        s, e = D.indptr[i], D.indptr[i + 1]
-        cols, vals = D.indices[s:e], D.data[s:e]
-        order = np.argsort(vals)
-        nbrs = [c for c in cols[order] if c != i][:k]
-        # pad if fewer than k (shouldn't happen for k<observed)
-        out[i, :len(nbrs)] = nbrs
-    return out
+Recall is the fraction of each cell's true k nearest neighbors recovered. The
+timing chart shows cold vs. warm side by side — note how much of pynndescent's
+cold time is one-time JIT.""")
 
-# exact ground truth
-_, exact = NearestNeighbors(n_neighbors=K + 1).fit(X).kneighbors(X)
-exact = exact[:, 1:]  # drop self
+code("""exact_idx = bl.exact_knn(X, K)
+for name, r in results.items():
+    r["recall"] = bl.recall_from_obsp(r["adata"], exact_idx, K)
+    print(f"{name:14s} recall@{K} = {r['recall']:.4f}")""")
 
-def recall(adata):
-    approx = knn_from_obsp(adata, K)
-    n = approx.shape[0]
-    return np.mean([len(set(approx[i]) & set(exact[i])) / K for i in range(n)])
-
-recalls = {name: recall(adata) for name, adata in res.items()}
-for name, r in recalls.items():
-    print(f"{name:12s} recall@{K} = {r:.4f}")""")
-
-code("""fig, ax = plt.subplots(1, 2, figsize=(11, 3.5))
-names = ["PiPNN", "pynndescent", "exact"]
-times = [t_pip, t_pyn, t_exact]
-ax[0].bar(names, times, color=["#2a9d8f", "#e76f51", "#999999"])
-ax[0].set_ylabel("sc.pp.neighbors time (s)"); ax[0].set_title("Build time (lower=better)")
-ax[1].bar(names, [recalls[n] for n in names], color=["#2a9d8f", "#e76f51", "#999999"])
-ax[1].set_ylim(0.9, 1.001); ax[1].set_ylabel(f"recall@{K}"); ax[1].set_title("Recall vs exact (higher=better)")
+code("""names = list(results.keys())
+x = np.arange(len(names)); w = 0.38
+fig, ax = plt.subplots(1, 2, figsize=(12, 3.8))
+ax[0].bar(x - w/2, [results[n]['cold'] for n in names], w, label='cold (incl. JIT)', color='#bbbbbb')
+ax[0].bar(x + w/2, [results[n]['warm_median'] for n in names], w, label='warm (steady-state)', color='#2a9d8f')
+ax[0].set_xticks(x); ax[0].set_xticklabels(names); ax[0].set_ylabel('sc.pp.neighbors (s)')
+ax[0].set_title('Build time: cold vs warm'); ax[0].legend()
+ax[1].bar(x, [results[n]['recall'] for n in names], color='#e76f51')
+ax[1].set_xticks(x); ax[1].set_xticklabels(names); ax[1].set_ylim(0.9, 1.001)
+ax[1].set_title(f'recall@{K} vs exact'); ax[1].set_ylabel('recall')
 plt.tight_layout(); plt.show()""")
 
 md("""## 5. UMAP embeddings, side by side
 
-We compute a UMAP for each backend's graph and color every panel by the **same
-reference labels** (Leiden on the exact graph), so spatial agreement is visible:
-if PiPNN's embedding reproduces the exact one, the colors land in the same places.""")
+Each backend's graph → its own UMAP, all colored by the **same** reference labels
+(Leiden on the exact graph). Matching colors in the same places = the embedding is
+reproduced despite the approximate graph.""")
 
-code("""# reference clustering from the exact graph
-sc.tl.leiden(res["exact"], flavor="igraph", n_iterations=2, key_added="ref")
-ref_labels = res["exact"].obs["ref"].values
-for adata in res.values():
-    adata.obs["ref"] = ref_labels
+code("""sc.tl.leiden(results["exact"]["adata"], flavor="igraph", n_iterations=2, key_added="ref")
+ref = results["exact"]["adata"].obs["ref"].values
+codes = results["exact"]["adata"].obs["ref"].cat.codes.values
+cmap = plt.cm.tab20(np.linspace(0, 1, len(np.unique(ref))))
 
-for name, adata in res.items():
-    sc.tl.umap(adata)
+for name, r in results.items():
+    r["adata"].obs["ref"] = ref
+    sc.tl.umap(r["adata"])
 
-fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-ncol = len(np.unique(ref_labels))
-cmap = plt.cm.tab20(np.linspace(0, 1, ncol))
-codes = res["exact"].obs["ref"].cat.codes.values
-for ax, name in zip(axes, ["exact", "PiPNN", "pynndescent"]):
-    U = res[name].obsm["X_umap"]
+names = list(results.keys())
+fig, axes = plt.subplots(1, len(names), figsize=(5*len(names), 5))
+if len(names) == 1: axes = [axes]
+for ax, name in zip(axes, names):
+    U = results[name]["adata"].obsm["X_umap"]
     ax.scatter(U[:, 0], U[:, 1], c=cmap[codes], s=2, linewidths=0)
-    ax.set_title(f"{name}  (recall@{K}={recalls[name]:.3f})")
+    ax.set_title(f"{name}  (recall={results[name]['recall']:.3f})")
     ax.set_xticks([]); ax.set_yticks([])
 plt.tight_layout(); plt.show()""")
 
-md("""## 6. Clustering agreement (ARI)
+md("""## 6. Clustering agreement (ARI vs. exact)
 
-Run Leiden independently on each backend's graph and measure Adjusted Rand Index
-against the exact-graph clustering. ARI ≈ 1 means the downstream biology is
-unchanged by swapping the ANN backend.""")
+Leiden on each backend's graph, scored against the exact-graph clustering. ARI ≈ 1
+means the downstream biology is unchanged by swapping ANN backend.""")
 
-code("""for name, adata in res.items():
-    sc.tl.leiden(adata, flavor="igraph", n_iterations=2, key_added="leiden")
-ari = {name: adjusted_rand_score(res["exact"].obs["leiden"], res[name].obs["leiden"])
-       for name in res}
-nclust = {name: res[name].obs["leiden"].nunique() for name in res}
-print(f"{'backend':12s} {'#clusters':>9s} {'ARI vs exact':>13s}")
-for name in ["exact", "PiPNN", "pynndescent"]:
-    print(f"{name:12s} {nclust[name]:9d} {ari[name]:13.4f}")""")
+code("""for name, r in results.items():
+    sc.tl.leiden(r["adata"], flavor="igraph", n_iterations=2, key_added="leiden")
+ref_leiden = results["exact"]["adata"].obs["leiden"]
+print(f"{'backend':14s} {'#clusters':>9s} {'ARI vs exact':>13s}")
+for name, r in results.items():
+    ari = adjusted_rand_score(ref_leiden, r["adata"].obs["leiden"])
+    print(f"{name:14s} {r['adata'].obs['leiden'].nunique():9d} {ari:13.4f}")""")
 
 md("""## 7. Neighbor-graph structure
 
-The distance distributions and connectivity counts should be near-identical
-across backends — a sanity check that PiPNN's graph is interchangeable with
-pynndescent's downstream.""")
+Distance distributions and connectivity counts should be near-identical across
+backends — confirming the graphs are interchangeable downstream.""")
 
-code("""fig, ax = plt.subplots(1, 2, figsize=(11, 3.5))
-for name, color in zip(["exact", "PiPNN", "pynndescent"], ["#999999", "#2a9d8f", "#e76f51"]):
-    d = res[name].obsp["distances"].data
-    ax[0].hist(d, bins=60, histtype="step", color=color, label=name, density=True)
+code("""fig, ax = plt.subplots(1, 2, figsize=(12, 3.8))
+colors = plt.cm.Set2(np.linspace(0, 1, len(results)))
+for (name, r), col in zip(results.items(), colors):
+    ax[0].hist(r["adata"].obsp["distances"].data, bins=60, histtype="step",
+               color=col, label=name, density=True)
 ax[0].set_title("kNN distance distribution"); ax[0].set_xlabel("distance"); ax[0].legend()
-nnz = [res[n].obsp["connectivities"].nnz for n in ["exact", "PiPNN", "pynndescent"]]
-ax[1].bar(["exact", "PiPNN", "pynndescent"], nnz, color=["#999999", "#2a9d8f", "#e76f51"])
+ax[1].bar(list(results.keys()), [r["conn_nnz"] for r in results.values()], color=colors)
 ax[1].set_title("connectivities nnz (graph density)")
 plt.tight_layout(); plt.show()""")
 
-md("""## 8. What PiPNN does under the hood (vs. pynndescent)
+md("""## 8. Reading the results
 
-**PiPNN** (`pipnn._pipnn`, Rust) builds a navigable graph then self-queries it:
+- **One-line swap.** Every backend is a `transformer=` argument; connectivities,
+  UMAP, and Leiden are identical machinery downstream.
+- **Warm vs cold matters.** pynndescent's cold time is inflated by numba JIT; the
+  warm numbers are the fair comparison. PiPNN (Rust) and glass (C++) have no JIT,
+  so their cold ≈ warm. PiPNN's build-time advantage grows with `n` (the win is at
+  100k–1M+ cells, where exact brute force is O(n²)).
+- **Quality.** All backends recover the embedding and clustering at high recall /
+  ARI, so the choice is about build speed and scaling, not result quality.
 
-1. **Randomized Ball Carving** — partition cells into overlapping leaves.
-2. **Leaf GEMM** — dense all-pairs distances per leaf (`‖x−y‖²=‖x‖²+‖y‖²−2XYᵀ`).
-3. **HashPrune** — online residualized-LSH pruning into an 8-byte/slot per-cell
-   reservoir (the paper's key idea; history-independent → deterministic).
-4. **RobustPrune** — Vamana-style pruning to a degree-`R` graph.
-5. **BeamSearch** — greedy graph search, seeded at each cell, for self-kNN.
-
-**pynndescent** instead does NN-Descent (iterative neighbor-of-neighbor descent)
-from a random-projection-tree initialization. Both return the same shape of
-result to scanpy — a kNN distance graph — which is why they're drop-in swappable.
-
-### Takeaways
-- One-line swap (`transformer=`) changes the ANN backend; everything downstream
-  (connectivities, UMAP, Leiden) is identical.
-- PiPNN matches exact recall closely and reproduces the embedding/clustering
-  (high ARI), while building the graph faster than pynndescent at scale.
+### Backends under the hood
+- **PiPNN** (Rust): ball carving → leaf GEMM → HashPrune (residualized-LSH
+  reservoirs) → RobustPrune → BeamSearch.
+- **pynndescent** (numba): NN-Descent from random-projection-tree init.
+- **pyglass** (C++): HNSW/NSG graph with SIMD + product/scalar quantization.
 """)
 
 nb["cells"] = c
-nb.metadata["kernelspec"] = {"name": "python3", "display_name": "Python 3", "language": "python"}
+nb.metadata["kernelspec"] = {"name": "pipnn-venv", "display_name": "PiPNN (venv)", "language": "python"}
 with open("notebooks/pipnn_vs_pynndescent.ipynb", "w") as f:
     nbf.write(nb, f)
 print("wrote notebooks/pipnn_vs_pynndescent.ipynb with", len(c), "cells")

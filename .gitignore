@@ -19,5 +19,8 @@ PiPNN.pdf
 *.h5ad
 *.npy
 
+# Docker bench outputs
+docker/out/
+
 # OS
 .DS_Store

@@ -1,0 +1,12 @@
+target/
+.venv/
+.git/
+pages/
+*.pdf
+*.h5ad
+*.npy
+__pycache__/
+.pytest_cache/
+.ipynb_checkpoints/
+notebooks/
+docker/out/
