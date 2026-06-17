@@ -128,6 +128,14 @@ def _plot(rows):
     n = [r["n"] for r in rows]
     fig, ax = plt.subplots(1, 2, figsize=(13, 4.8))
 
+    # Optional "before" PiPNN curve for a before/after comparison.
+    old_path = HERE / "scaling_results_before.json"
+    if old_path.exists():
+        old = json.load(open(old_path))
+        on = [r["n"] for r in old]
+        ax[0].plot(on, [r["pipnn_s"] for r in old], "o--", color="#9ecfc7",
+                   label="PiPNN (before)")
+
     # Build time vs n (log-log).
     ax[0].plot(n, [r["pipnn_s"] for r in rows], "o-", color="#2a9d8f", label="PiPNN")
     ax[0].plot(n, [r["pynnd_s"] for r in rows], "s-", color="#e76f51", label="pynndescent")

@@ -85,8 +85,20 @@ fn build_and_self_knn<'py>(
             if n <= bp.c_max.min(2048) && n <= 4096 {
                 knn_self_bruteforce(&data, n_neighbors)
             } else {
+                let prof = std::env::var("PIPNN_PROFILE").is_ok();
+                let t = std::time::Instant::now();
                 let graph = build_index(&data, &bp);
-                knn_self_graph(&data, &graph, n_neighbors, &sp)
+                let tb = t.elapsed().as_secs_f64();
+                let t2 = std::time::Instant::now();
+                let r = knn_self_graph(&data, &graph, n_neighbors, &sp);
+                if prof {
+                    eprintln!(
+                        "[pipnn] BUILD={:.3}s QUERY={:.3}s",
+                        tb,
+                        t2.elapsed().as_secs_f64()
+                    );
+                }
+                r
             }
         };
         match &pool {

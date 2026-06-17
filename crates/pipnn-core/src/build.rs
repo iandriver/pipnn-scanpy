@@ -22,14 +22,33 @@ pub fn build_index(data: &Dataset, p: &BuildParams) -> Graph {
         return Graph::from_adjacency(Vec::new(), 0);
     }
 
+    // Optional stage profiling: set PIPNN_PROFILE=1 to print per-stage timings.
+    let prof = std::env::var("PIPNN_PROFILE").is_ok();
+    let mark = std::time::Instant::now();
+    macro_rules! lap {
+        ($label:expr, $t:expr) => {
+            if prof {
+                eprintln!("[pipnn] {:<14} {:>7.3}s", $label, $t.elapsed().as_secs_f64());
+                $t = std::time::Instant::now();
+            }
+        };
+    }
+    let mut t = mark;
+
     // Alg 4 line 2: partition into overlapping leaves.
     let leaves = partition(data, p);
+    if prof {
+        let tot: usize = leaves.iter().map(|l| l.len()).sum();
+        eprintln!("[pipnn] leaves={} repl={:.2}x", leaves.len(), tot as f64 / n as f64);
+    }
+    lap!("partition", t);
 
     // HashPrune setup: hyperplanes + precomputed sketch S = X·Hᵀ (n × m).
     let hp = Hyperplanes::new(p.m, data.d, p.seed);
     let sketch = hp.sketch_all(data);
     let m = p.m;
     let cand_cap = p.l_max;
+    lap!("sketch", t);
 
     // Alg 4 lines 3–5 ("Pick" + "Prune_And_Add_Edges"): stream each leaf's
     // candidate edges directly into per-point HashPrune reservoirs. The reservoir
@@ -47,33 +66,39 @@ pub fn build_index(data: &Dataset, p: &BuildParams) -> Graph {
         }
         let d2 = leaf_sq_dists(data, leaf);
         let cap = cand_cap.min(s - 1);
-        let mut best: Vec<(f32, Id)> = Vec::with_capacity(cap + 1);
+        // Reusable scratch of (dist, id) pairs for one row's candidates.
+        let mut scratch: Vec<(f32, Id)> = Vec::with_capacity(s);
         for a in 0..s {
             let pa = leaf[a] as usize;
             let row = &d2[a * s..(a + 1) * s];
-            best.clear();
+            // Gather this row's candidates (excluding self).
+            scratch.clear();
             for b in 0..s {
-                if b == a {
-                    continue;
-                }
-                let dist = row[b];
-                if best.len() < cap {
-                    best.push((dist, leaf[b]));
-                    best.sort_by(|x, y| x.0.partial_cmp(&y.0).unwrap());
-                } else if dist < best[cap - 1].0 {
-                    best[cap - 1] = (dist, leaf[b]);
-                    best.sort_by(|x, y| x.0.partial_cmp(&y.0).unwrap());
+                if b != a {
+                    scratch.push((row[b], leaf[b]));
                 }
             }
+            // Select the `cap` nearest in O(len) via quickselect, then sort just
+            // those (paper §4.2 keeps each point's nearest in-leaf candidates).
+            // This replaces an O(s²·cap) insertion sort — the leaf-build hot spot.
+            if scratch.len() > cap {
+                scratch.select_nth_unstable_by(cap, |x, y| {
+                    x.0.partial_cmp(&y.0).unwrap()
+                });
+                scratch.truncate(cap);
+            }
+            scratch.sort_by(|x, y| x.0.partial_cmp(&y.0).unwrap());
+
             let sa = &sketch[pa * m..(pa + 1) * m];
             let mut res = reservoirs[pa].lock().unwrap();
-            for &(dist, dst) in &best {
+            for &(dist, dst) in &scratch {
                 let sc = &sketch[dst as usize * m..(dst as usize + 1) * m];
                 let code = hp.code_from_sketch(sa, sc);
                 res.insert(dst, code, dist);
             }
         }
     });
+    lap!("leaf+hashprune", t);
 
     // Alg 4 line 8 ("PruneNode"): RobustPrune each reservoir to ≤ R out-edges.
     let out_adj: Vec<Vec<Id>> = reservoirs
@@ -84,10 +109,12 @@ pub fn build_index(data: &Dataset, p: &BuildParams) -> Graph {
             robust_prune(data, x as Id, &mut c, p.alpha, p.r)
         })
         .collect();
+    lap!("robustprune", t);
 
     // Symmetrize for navigability (Vamana-style reverse edges), then cap degree.
     let final_adj = symmetrize(data, &out_adj, p.r);
     let entry = approx_medoid(data);
+    lap!("symmetrize", t);
     Graph::from_adjacency(final_adj, entry)
 }
 
