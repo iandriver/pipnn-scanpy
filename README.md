@@ -111,6 +111,33 @@ installs and the `GlassTransformer` API matches, but the benchmark is not
 runnable under emulation. The native notebook (PiPNN/pynndescent/exact) is the
 authoritative timing comparison on Apple Silicon.
 
+## Scaling: PiPNN vs pynndescent
+
+`bench/bench_scaling.py` sweeps dataset size and times the kNN-graph build (warm,
+min-of-N — pynndescent JIT excluded) with recall@15 vs exact. Synthetic 50-d data,
+constant cluster density, all cores. Plot: `bench/scaling.png`.
+
+![scaling](bench/scaling.png)
+
+| cells | PiPNN build | pynndescent build | PiPNN recall | pynndescent recall | peak RSS |
+|------:|------------:|------------------:|-------------:|-------------------:|---------:|
+| 5k    | 0.48s | 0.45s | 1.000 | 0.972 | 0.9 GB |
+| 25k   | 0.50s | 0.47s | 1.000 | 0.865 | 1.3 GB |
+| 100k  | 1.92s | 0.79s | 0.999 | 0.826 | 2.1 GB |
+| 200k  | 3.94s | 1.37s | 0.999 | 0.831 | 2.6 GB |
+| 400k  | 8.89s | 2.50s | 0.999 | 0.831 | 4.0 GB |
+| 800k  | 22.1s | 4.77s | 0.999 | 0.836 | 5.9 GB |
+
+**Honest read:** the two are par up to ~25k, after which **pynndescent's build
+scales better** (≈linear) and PiPNN's grows faster — the per-leaf halo is
+`O(n²/c_max)`, which dominates the tail (this is the documented scaling limit).
+So at warm steady-state pynndescent is the faster *builder* at scale. PiPNN's edge
+is **accuracy**: it holds recall@15 ≈ 1.0 at every size, while pynndescent at its
+defaults plateaus near 0.82–0.84. In short — PiPNN trades build speed for
+near-exact, size-stable recall. Two levers change the trade: lower `beam_L`
+(faster PiPNN, slightly lower recall), and fixing the halo to a hierarchical /
+approximate nearest-leaf search would flatten PiPNN's curve (future work).
+
 ## Metrics
 
 `euclidean` (default, matches scanpy on PCA space) and `cosine`.
