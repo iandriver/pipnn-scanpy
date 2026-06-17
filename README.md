@@ -119,26 +119,36 @@ constant cluster density, all cores. Plot: `bench/scaling.png`.
 
 ![scaling](bench/scaling.png)
 
-| cells | PiPNN build | pynndescent build | PiPNN recall | pynndescent recall | peak RSS |
-|------:|------------:|------------------:|-------------:|-------------------:|---------:|
-| 5k    | **0.07s** | 0.45s | 1.000 | 0.972 | 0.9 GB |
-| 25k   | **0.23s** | 0.47s | 1.000 | 0.865 | 1.3 GB |
-| 50k   | **0.50s** | 0.56s | 0.999 | 0.817 | 1.7 GB |
-| 100k  | 1.09s | 0.79s | 0.999 | 0.824 | 2.2 GB |
-| 200k  | 2.43s | 1.36s | 0.999 | 0.829 | 2.7 GB |
-| 400k  | 5.71s | 2.48s | 0.999 | 0.829 | 4.1 GB |
-| 800k  | 15.7s | 4.87s | 0.999 | 0.834 | 6.0 GB |
+| cells | PiPNN build | pynndescent build | speedup | PiPNN recall | pynndescent recall | peak RSS |
+|------:|------------:|------------------:|--------:|-------------:|-------------------:|---------:|
+| 5k    | **0.06s** | 0.46s | **8.3×** | 1.000 | 0.972 | 0.9 GB |
+| 25k   | **0.14s** | 0.48s | **3.4×** | 1.000 | 0.866 | 1.3 GB |
+| 50k   | **0.33s** | 0.58s | **1.8×** | 0.997 | 0.817 | 1.6 GB |
+| 100k  | **0.66s** | 0.81s | **1.2×** | 0.998 | 0.827 | 2.2 GB |
+| 200k  | 1.43s | 1.40s | ~1.0× | 0.998 | 0.831 | 2.8 GB |
+| 400k  | 3.19s | 2.56s | 0.80× | 0.997 | 0.832 | 3.9 GB |
+| 800k  | 9.22s | 4.84s | 0.53× | 0.997 | 0.836 | 6.0 GB |
 
-**Read:** PiPNN is **faster than pynndescent up to ~50k cells** and within ~2–3×
-at the 100k–800k scale, while holding recall@15 ≈ 1.0 at every size (pynndescent
-at its defaults plateaus near 0.82–0.84). These numbers reflect a leaf-build
-optimization (quickselect candidate selection replacing an `O(s²·ℓ_max)` insertion
-sort) that cut build time 1.4–6.6× with **no recall change** — bottleneck profiling
-(set `PIPNN_PROFILE=1`) showed leaf building, not partitioning, was the hot spot.
-The remaining tail cost is the BeamSearch query plus the `O(n²/c_max)` halo;
-further levers: lower `beam_L` (e.g. 60 → recall ~0.997, faster query), SIMD
-distance kernels, and a hierarchical/approximate halo. See `bench/scaling.png`
-for the before/after curves.
+**Read:** PiPNN is **faster than pynndescent up to ~150k cells**, on par to ~200k,
+and within ~2× at 800k — all while holding recall@15 ≈ 1.0 at every size
+(pynndescent at its defaults plateaus near 0.82–0.84). See `bench/scaling.png` for
+the before/after curves (the dashed line is the pre-optimization build).
+
+This took four targeted, **recall-neutral** optimizations — found by profiling
+(`PIPNN_PROFILE=1` prints per-stage timings), not guesswork:
+1. **Leaf candidate selection** via quickselect, replacing an `O(s²·ℓ_max)`
+   insertion sort (the real hot spot — partitioning never was).
+2. **Portable SIMD** (`wide::f32x8` → NEON/AVX) for the squared-L2 kernel that
+   BeamSearch, RobustPrune, carving, and the halo all bottom out in.
+3. **`beam_L` default 100 → 64** (recall ~0.997, faster query).
+4. **De-quadratified partitioning**: both the ball-carving assignment and the
+   overlap halo were `O(n²/c_max)` (a fat single level / a global centroid scan);
+   bounded branching + a coarse `√t` super-group index over leaf centroids make
+   them near-linear.
+
+Net effect at 800k: build+query 22s → 9.2s (≈2.4×). The remaining tail is the
+BeamSearch self-query (~half the time at 800k); a cheaper self-kNN extraction is
+the next lever.
 
 ## Metrics
 

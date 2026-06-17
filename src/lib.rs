@@ -24,7 +24,7 @@ use pipnn_core::{
 #[allow(clippy::too_many_arguments)]
 #[pyo3(signature = (
     x, n_neighbors, metric="euclidean",
-    m=12, l_max=96, r=64, alpha=1.2, beam_l=100,
+    m=12, l_max=96, r=64, alpha=1.2, beam_l=64,
     fanout=2, c_min=256, c_max=2048, n_jobs=0, seed=0,
 ))]
 fn build_and_self_knn<'py>(

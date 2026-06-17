@@ -42,14 +42,42 @@ impl Metric {
 }
 
 /// Squared Euclidean distance between two equal-length slices.
+///
+/// Explicit portable SIMD (`wide::f32x8` → NEON on arm64, AVX on x86). Two
+/// independent accumulators break the dependency chain so the FMA units stay
+/// busy. This is the hottest kernel in the build (BeamSearch, RobustPrune, ball
+/// carving, halo all bottom out here).
 #[inline]
 pub fn sq_l2(a: &[f32], b: &[f32]) -> f32 {
+    use wide::f32x8;
     debug_assert_eq!(a.len(), b.len());
-    let mut acc = 0.0f32;
-    // Auto-vectorizes well; a hand-written SIMD kernel is a Phase 8 optimization.
-    for i in 0..a.len() {
+    let n = a.len();
+    let chunks = n / 8;
+    let mut acc0 = f32x8::ZERO;
+    let mut acc1 = f32x8::ZERO;
+    let mut i = 0;
+    // Process 16 lanes per iteration with two accumulators.
+    while i + 16 <= chunks * 8 {
+        let da = f32x8::new(a[i..i + 8].try_into().unwrap())
+            - f32x8::new(b[i..i + 8].try_into().unwrap());
+        let db = f32x8::new(a[i + 8..i + 16].try_into().unwrap())
+            - f32x8::new(b[i + 8..i + 16].try_into().unwrap());
+        acc0 += da * da;
+        acc1 += db * db;
+        i += 16;
+    }
+    while i + 8 <= n {
+        let d = f32x8::new(a[i..i + 8].try_into().unwrap())
+            - f32x8::new(b[i..i + 8].try_into().unwrap());
+        acc0 += d * d;
+        i += 8;
+    }
+    let mut acc = (acc0 + acc1).reduce_add();
+    // Scalar tail (d not a multiple of 8).
+    while i < n {
         let diff = a[i] - b[i];
         acc += diff * diff;
+        i += 1;
     }
     acc
 }
