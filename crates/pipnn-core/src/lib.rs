@@ -17,9 +17,9 @@ pub mod partition;
 pub mod robust_prune;
 pub mod search;
 
-pub use batch_query::knn_self_graph;
+pub use batch_query::{knn_self_graph, knn_self_reservoir};
 pub use bruteforce::{knn_self_bruteforce, SelfKnn};
-pub use build::build_index;
+pub use build::{build_index, build_index_with_cands};
 pub use dataset::{Dataset, Id};
 pub use graph::Graph;
 pub use hashprune::{Hyperplanes, Reservoir};

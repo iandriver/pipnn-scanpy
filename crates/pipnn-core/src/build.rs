@@ -17,9 +17,22 @@ use crate::robust_prune::robust_prune;
 
 /// Build the navigable graph index over `data`.
 pub fn build_index(data: &Dataset, p: &BuildParams) -> Graph {
+    build_index_with_cands(data, p, 0).0
+}
+
+/// Build the index and additionally return, per point, its top-`m_cands`
+/// reservoir candidates `(id, sq_dist)` sorted ascending (empty when
+/// `m_cands == 0`). These are each point's nearest in-build candidates — the
+/// direct, high-recall answer to *self*-kNN, before RobustPrune discards the
+/// close-but-redundant ones for navigability. See [`crate::batch_query::knn_self_reservoir`].
+pub fn build_index_with_cands(
+    data: &Dataset,
+    p: &BuildParams,
+    m_cands: usize,
+) -> (Graph, Vec<Vec<(Id, f32)>>) {
     let n = data.n;
     if n == 0 {
-        return Graph::from_adjacency(Vec::new(), 0);
+        return (Graph::from_adjacency(Vec::new(), 0), Vec::new());
     }
 
     // Optional stage profiling: set PIPNN_PROFILE=1 to print per-stage timings.
@@ -101,21 +114,29 @@ pub fn build_index(data: &Dataset, p: &BuildParams) -> Graph {
     lap!("leaf+hashprune", t);
 
     // Alg 4 line 8 ("PruneNode"): RobustPrune each reservoir to ≤ R out-edges.
-    let out_adj: Vec<Vec<Id>> = reservoirs
+    // Optionally stash each point's top-`m_cands` nearest candidates first (the
+    // self-kNN seed) — RobustPrune mutates/consumes the sorted list.
+    let (out_adj, self_cands): (Vec<Vec<Id>>, Vec<Vec<(Id, f32)>>) = reservoirs
         .into_par_iter()
         .enumerate()
         .map(|(x, res)| {
             let mut c = res.into_inner().unwrap().into_sorted();
-            robust_prune(data, x as Id, &mut c, p.alpha, p.r)
+            let cands = if m_cands > 0 {
+                c.iter().take(m_cands).copied().collect()
+            } else {
+                Vec::new()
+            };
+            let adj = robust_prune(data, x as Id, &mut c, p.alpha, p.r);
+            (adj, cands)
         })
-        .collect();
+        .unzip();
     lap!("robustprune", t);
 
     // Symmetrize for navigability (Vamana-style reverse edges), then cap degree.
     let final_adj = symmetrize(data, &out_adj, p.r);
     let entry = approx_medoid(data);
     lap!("symmetrize", t);
-    Graph::from_adjacency(final_adj, entry)
+    (Graph::from_adjacency(final_adj, entry), self_cands)
 }
 
 /// Add reverse edges and cap each node's degree at `r` by keeping its `r`

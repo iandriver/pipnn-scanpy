@@ -59,7 +59,7 @@ fn recall_graph_gaussian_10k() {
     let bp = BuildParams::default();
     let sp = SearchParams { beam_l: 100 };
     let graph = build_index(&data, &bp);
-    let approx = knn_self_graph(&data, &graph, k, &sp);
+    let approx = knn_self_graph(&data, &graph, None, k, &sp);
     let exact = knn_self_bruteforce(&data, k);
     let r = recall_at_k(&approx.indices, &exact.indices, n, approx.stride);
     println!("gaussian recall@{k} = {r:.4}");
@@ -76,7 +76,7 @@ fn recall_graph_vs_bruteforce() {
     let sp = SearchParams { beam_l: 100 };
 
     let graph = build_index(&data, &bp);
-    let approx = knn_self_graph(&data, &graph, k, &sp);
+    let approx = knn_self_graph(&data, &graph, None, k, &sp);
     let exact = knn_self_bruteforce(&data, k);
 
     assert_eq!(approx.stride, exact.stride);

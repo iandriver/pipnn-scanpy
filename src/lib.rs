@@ -10,7 +10,8 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 use pipnn_core::{
-    build_index, knn_self_bruteforce, knn_self_graph, BuildParams, Dataset, Metric, SearchParams,
+    build_index_with_cands, knn_self_bruteforce, knn_self_graph, knn_self_reservoir, BuildParams,
+    Dataset, Metric, SearchParams,
 };
 
 /// Build the index and return self-kNN as flat arrays.
@@ -86,16 +87,28 @@ fn build_and_self_knn<'py>(
                 knn_self_bruteforce(&data, n_neighbors)
             } else {
                 let prof = std::env::var("PIPNN_PROFILE").is_ok();
+                // Query method (override with PIPNN_QUERY). Default "warm":
+                // BeamSearch seeded from each point's reservoir candidates (high
+                // recall, fast). "reservoir": candidates + 1-hop only (fastest,
+                // lower recall). "beam": cold BeamSearch from the point alone.
+                let method = std::env::var("PIPNN_QUERY").unwrap_or_else(|_| "warm".into());
+                let m_cands = (n_neighbors + 1).max(32).min(bp.l_max);
+
                 let t = std::time::Instant::now();
-                let graph = build_index(&data, &bp);
+                let (graph, cands) = build_index_with_cands(&data, &bp, m_cands);
                 let tb = t.elapsed().as_secs_f64();
                 let t2 = std::time::Instant::now();
-                let r = knn_self_graph(&data, &graph, n_neighbors, &sp);
+                let r = match method.as_str() {
+                    "reservoir" => knn_self_reservoir(&data, &graph, &cands, n_neighbors, true),
+                    "beam" => knn_self_graph(&data, &graph, None, n_neighbors, &sp),
+                    _ => knn_self_graph(&data, &graph, Some(&cands), n_neighbors, &sp),
+                };
                 if prof {
                     eprintln!(
-                        "[pipnn] BUILD={:.3}s QUERY={:.3}s",
+                        "[pipnn] BUILD={:.3}s QUERY={:.3}s [{}]",
                         tb,
-                        t2.elapsed().as_secs_f64()
+                        t2.elapsed().as_secs_f64(),
+                        method
                     );
                 }
                 r

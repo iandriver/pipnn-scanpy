@@ -121,20 +121,21 @@ constant cluster density, all cores. Plot: `bench/scaling.png`.
 
 | cells | PiPNN build | pynndescent build | speedup | PiPNN recall | pynndescent recall | peak RSS |
 |------:|------------:|------------------:|--------:|-------------:|-------------------:|---------:|
-| 5k    | **0.06s** | 0.46s | **8.3×** | 1.000 | 0.972 | 0.9 GB |
-| 25k   | **0.14s** | 0.48s | **3.4×** | 1.000 | 0.866 | 1.3 GB |
-| 50k   | **0.33s** | 0.58s | **1.8×** | 0.997 | 0.817 | 1.6 GB |
-| 100k  | **0.66s** | 0.81s | **1.2×** | 0.998 | 0.827 | 2.2 GB |
-| 200k  | 1.43s | 1.40s | ~1.0× | 0.998 | 0.831 | 2.8 GB |
-| 400k  | 3.19s | 2.56s | 0.80× | 0.997 | 0.832 | 3.9 GB |
-| 800k  | 9.22s | 4.84s | 0.53× | 0.997 | 0.836 | 6.0 GB |
+| 5k    | **0.06s** | 0.46s | **7.8×** | 1.000 | 0.973 | 0.8 GB |
+| 25k   | **0.15s** | 0.47s | **3.2×** | 1.000 | 0.868 | 1.4 GB |
+| 50k   | **0.29s** | 0.57s | **2.0×** | 0.997 | 0.818 | 1.6 GB |
+| 100k  | **0.60s** | 0.79s | **1.3×** | 0.998 | 0.825 | 2.2 GB |
+| 200k  | **1.23s** | 1.35s | **1.1×** | 0.998 | 0.830 | 2.9 GB |
+| 400k  | 2.55s | 2.49s | ~1.0× | 0.997 | 0.833 | 4.1 GB |
+| 800k  | 5.47s | 4.82s | 0.88× | 0.997 | 0.832 | 6.6 GB |
 
-**Read:** PiPNN is **faster than pynndescent up to ~150k cells**, on par to ~200k,
-and within ~2× at 800k — all while holding recall@15 ≈ 1.0 at every size
+**Read:** PiPNN is **faster than pynndescent through ~200k cells**, on par at
+400k, and within ~12% at 800k — all while holding recall@15 ≈ 1.0 at every size
 (pynndescent at its defaults plateaus near 0.82–0.84). See `bench/scaling.png` for
-the before/after curves (the dashed line is the pre-optimization build).
+the before/after curves (the dashed line is the original build — a ~4× speedup at
+800k, 22s → 5.5s).
 
-This took four targeted, **recall-neutral** optimizations — found by profiling
+This came from five **recall-neutral** optimizations, each found by profiling
 (`PIPNN_PROFILE=1` prints per-stage timings), not guesswork:
 1. **Leaf candidate selection** via quickselect, replacing an `O(s²·ℓ_max)`
    insertion sort (the real hot spot — partitioning never was).
@@ -145,10 +146,10 @@ This took four targeted, **recall-neutral** optimizations — found by profiling
    overlap halo were `O(n²/c_max)` (a fat single level / a global centroid scan);
    bounded branching + a coarse `√t` super-group index over leaf centroids make
    them near-linear.
-
-Net effect at 800k: build+query 22s → 9.2s (≈2.4×). The remaining tail is the
-BeamSearch self-query (~half the time at 800k); a cheaper self-kNN extraction is
-the next lever.
+5. **Self-query**: BeamSearch reused a `vec![false; n]` per query (`O(n²)` zeroing
+   across all `n` queries) — now a per-thread reusable scratch reset only on
+   touched entries, warm-started from each point's reservoir candidates. Cut the
+   800k query ~2×.
 
 ## Metrics
 
