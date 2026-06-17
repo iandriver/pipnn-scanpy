@@ -28,37 +28,29 @@ uv pip install --python .venv/bin/python maturin numpy scipy scikit-learn scanpy
 
 The full PiPNN build pipeline, in Rust with `rayon` parallelism:
 
-- **Randomized Ball Carving** partitioning (paper Alg 5), as a two-stage
-  disjoint-carve + bounded-halo scheme so total replication is ≈`fanout`
-  (not `fanout^depth`).
+- **Randomized Ball Carving** partitioning (paper Alg 5): near-linear
+  bounded-branching recursion, plus a `fanout`-overlap halo (via a coarse `√t`
+  super-group index over leaf centroids) so replication stays ≈`fanout`.
 - **Leaf GEMM** all-pairs distances (`‖x−y‖² = ‖x‖²+‖y‖²−2XYᵀ`, paper §4.2).
 - **HashPrune** online residualized-LSH pruning (paper Alg 3) with the 8-byte
   reservoir slot; candidates stream straight into per-point reservoirs (the only
   persistent build state) — history-independent, so the build is deterministic.
 - **RobustPrune** (Alg 2) to a degree-`R` navigable graph.
-- **BeamSearch** (Alg 1) self-query, seeded at each point for robust self-kNN.
+- **BeamSearch** (Alg 1) self-query, **warm-started** from each point's reservoir
+  candidates and using a per-thread reusable scratch (no per-query allocation).
 
-Small inputs (`n ≤ 4096`) use an exact brute-force path that doubles as the
-recall oracle. For very large/held-out queries, a global navigable index +
-held-out `transform(X_new)` is future work.
+Performance is portable-SIMD (`wide::f32x8` → NEON/AVX) throughout, and the
+partition + halo are near-linear (bounded branching + a coarse `√t` centroid
+index). Small inputs (`n ≤ 4096`) use an exact brute-force path that doubles as
+the recall oracle. For held-out queries, a `transform(X_new)` path is future work.
 
-## Performance (50-d, M3-class laptop, 16 threads)
+## Performance
 
-| n        | build+query | recall@15 | peak RSS |
-|----------|-------------|-----------|----------|
-| 100k     | ~1.8 s      | 0.9999    | ~0.4 GB* |
-| 500k     | ~13 s       | 0.988     | ~2.0 GB* |
-
-`*` PiPNN-only; benchmark-process peaks are higher because they also hold the
-sklearn exact-NN ground truth. At 100k, PiPNN built **~2.7× faster than
-pynndescent** (cold start) at equal-or-better recall.
-
-### Scaling notes
-
-Comfortable to ~1M cells (~4–5 GB). Beyond that, two known costs need the
-Phase-8 optimizations: the halo step is `O(n²/c_max)`, and the per-leaf GEMM
-transient grows with leaf size. Raise `c_max` / lower `fanout` to trade recall
-for memory, or set `n_jobs` to bound thread-level transient memory.
+See **[Scaling](#scaling-pipnn-vs-pynndescent)** below for the full table — PiPNN
+builds the kNN graph **faster than pynndescent through ~200k cells**, is on par at
+400k, and within ~12% at 800k, at recall@15 ≈ 1.0 throughout (~4 GB at 400k,
+~6.5 GB at 800k). Tune `n_jobs` to bound thread-level transient memory, and
+`beam_L` / `c_max` to trade a little recall for speed/memory.
 
 ## Comparison notebook
 
