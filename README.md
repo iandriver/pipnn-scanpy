@@ -107,9 +107,13 @@ authoritative timing comparison on Apple Silicon.
 
 `bench/bench_scaling.py` sweeps dataset size and times the kNN-graph build (warm,
 min-of-N — pynndescent JIT excluded) with recall@15 vs exact. Synthetic 50-d data,
-constant cluster density, all cores. Plot: `bench/scaling.png`.
+constant cluster density, all cores.
 
-![scaling](bench/scaling.png)
+![PiPNN vs pynndescent build-time and recall scaling, 5k–800k cells](bench/scaling.png)
+
+*Left: warm build time vs n (log-log). Solid = PiPNN now; dashed = PiPNN before
+this work's optimizations; the curve dropped ~4× at 800k. Right: recall@15 — PiPNN
+holds ≈1.0 at every size while pynndescent (defaults) falls to ~0.82.*
 
 | cells | PiPNN build | pynndescent build | speedup | PiPNN recall | pynndescent recall | peak RSS |
 |------:|------------:|------------------:|--------:|-------------:|-------------------:|---------:|
@@ -121,13 +125,28 @@ constant cluster density, all cores. Plot: `bench/scaling.png`.
 | 400k  | 2.55s | 2.49s | ~1.0× | 0.997 | 0.833 | 4.1 GB |
 | 800k  | 5.47s | 4.82s | 0.88× | 0.997 | 0.832 | 6.6 GB |
 
-**Read:** PiPNN is **faster than pynndescent through ~200k cells**, on par at
-400k, and within ~12% at 800k — all while holding recall@15 ≈ 1.0 at every size
-(pynndescent at its defaults plateaus near 0.82–0.84). See `bench/scaling.png` for
-the before/after curves (the dashed line is the original build — a ~4× speedup at
-800k, 22s → 5.5s).
+### Tradeoffs vs pynndescent
 
-This came from five **recall-neutral** optimizations, each found by profiling
+| | **PiPNN** | **pynndescent** |
+|---|---|---|
+| **Recall@15** (defaults) | **≈1.0 at all sizes** | 0.97 → **~0.82** as n grows |
+| **Warm build** | faster ≤200k, ~tied 400k, ~12% slower 800k | flat/low; scales slightly better past ~400k |
+| **Cold (first) build** | same as warm | **+5–10 s numba JIT** on first call |
+| **Determinism** | **deterministic** (seed → identical graph) | randomized/approximate |
+| **Runtime deps** | self-contained Rust wheel (no JIT) | numba + llvmlite |
+| **Maturity** | new | battle-tested, scanpy default |
+
+**When PiPNN wins:** you want near-exact neighbors (recall matters for
+clustering/UMAP fidelity), reproducible graphs, fast first-call (notebooks,
+CI, many small datasets), or you're at ≤ a few hundred thousand cells.
+**When pynndescent is fine:** atlas-scale (≳1M cells) where its slightly better
+warm scaling helps and lower recall is acceptable — though to *match* PiPNN's
+recall it must raise its build parameters, which narrows or erases the speed gap.
+
+To trade PiPNN's recall for more speed, lower `beam_L` (e.g. 64 → 40 ≈ recall
+0.99) or set `PIPNN_QUERY=reservoir` (fastest, ~0.93 recall).
+
+These build-time gains came from five **recall-neutral** optimizations, found by profiling
 (`PIPNN_PROFILE=1` prints per-stage timings), not guesswork:
 1. **Leaf candidate selection** via quickselect, replacing an `O(s²·ℓ_max)`
    insertion sort (the real hot spot — partitioning never was).
