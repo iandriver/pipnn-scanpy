@@ -120,41 +120,86 @@ def main():
     print("\nwrote bench/scaling_results.json and bench/scaling.png")
 
 
+def _crossover(ns, pip, pyn):
+    """Interpolate (in log-log) the n where PiPNN and pynndescent build times meet."""
+    import math
+    for i in range(len(ns) - 1):
+        d0, d1 = pip[i] - pyn[i], pip[i + 1] - pyn[i + 1]
+        if d0 == 0:
+            return ns[i]
+        if d0 < 0 <= d1 or d1 < 0 <= d0:  # sign change → crossover in this segment
+            r0 = math.log(pip[i] / pyn[i])
+            r1 = math.log(pip[i + 1] / pyn[i + 1])
+            t = (0 - r0) / (r1 - r0)
+            return math.exp(math.log(ns[i]) + t * (math.log(ns[i + 1]) - math.log(ns[i])))
+    return None
+
+
 def _plot(rows):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     n = [r["n"] for r in rows]
+    pip = [r["pipnn_s"] for r in rows]
+    pyn = [r["pynnd_s"] for r in rows]
     fig, ax = plt.subplots(1, 2, figsize=(13, 4.8))
+    a0, a1 = ax
 
-    # Optional "before" PiPNN curve for a before/after comparison.
+    # "before" PiPNN curve for the before/after comparison.
     old_path = HERE / "scaling_results_before.json"
-    if old_path.exists():
-        old = json.load(open(old_path))
+    old = json.load(open(old_path)) if old_path.exists() else None
+
+    # --- left: build time vs n (log-log) ---
+    cross = _crossover(n, pip, pyn)
+    if cross:
+        # Shade the region where PiPNN is the faster builder.
+        a0.axvspan(min(n) * 0.8, cross, color="#2a9d8f", alpha=0.06, zorder=0)
+        a0.axvline(cross, color="#888", ls=":", lw=1, zorder=1)
+        a0.annotate(f"crossover ≈{cross/1000:.0f}k\n← PiPNN faster   pynndescent faster →",
+                    xy=(cross, min(pip) * 1.6), ha="center", va="bottom",
+                    fontsize=8.5, color="#444")
+
+    if old:
         on = [r["n"] for r in old]
-        ax[0].plot(on, [r["pipnn_s"] for r in old], "o--", color="#9ecfc7",
-                   label="PiPNN (before)")
+        a0.plot(on, [r["pipnn_s"] for r in old], "o--", color="#9ecfc7",
+                label="PiPNN (before optim.)", zorder=2)
+        # Annotate the before/after gap at the largest shared n.
+        nb, sb = on[-1], old[-1]["pipnn_s"]
+        if nb == n[-1]:
+            sa = pip[-1]
+            a0.annotate("", xy=(nb, sa), xytext=(nb, sb),
+                        arrowprops=dict(arrowstyle="<->", color="#2a9d8f", lw=1.4))
+            a0.annotate(f"{sb/sa:.1f}× faster", xy=(nb, (sa * sb) ** 0.5),
+                        xytext=(-6, 0), textcoords="offset points",
+                        ha="right", va="center", fontsize=9, color="#2a9d8f", fontweight="bold")
 
-    # Build time vs n (log-log).
-    ax[0].plot(n, [r["pipnn_s"] for r in rows], "o-", color="#2a9d8f", label="PiPNN")
-    ax[0].plot(n, [r["pynnd_s"] for r in rows], "s-", color="#e76f51", label="pynndescent")
-    ax[0].set_xscale("log"); ax[0].set_yscale("log")
-    ax[0].set_xlabel("cells (n)"); ax[0].set_ylabel("warm build time (s)")
-    ax[0].set_title("kNN graph build time vs n (warm, log-log)")
-    ax[0].grid(True, which="both", alpha=0.3); ax[0].legend()
+    a0.plot(n, pip, "o-", color="#2a9d8f", label="PiPNN", zorder=3)
+    a0.plot(n, pyn, "s-", color="#e76f51", label="pynndescent", zorder=3)
+    a0.set_xscale("log"); a0.set_yscale("log")
+    a0.set_xlabel("cells (n)"); a0.set_ylabel("warm build time (s)")
+    a0.set_title("kNN graph build time vs n  (warm, JIT excluded)")
+    a0.grid(True, which="both", alpha=0.3); a0.legend(loc="upper left", fontsize=9)
 
-    # Recall vs n — the headline: PiPNN holds, pynndescent (defaults) degrades.
-    ax[1].plot(n, [r["pipnn_recall"] for r in rows], "o-", color="#2a9d8f", label="PiPNN")
-    ax[1].plot(n, [r["pynnd_recall"] for r in rows], "s-", color="#e76f51", label="pynndescent")
-    ax[1].set_xscale("log"); ax[1].set_ylim(0.55, 1.02)
-    ax[1].set_xlabel("cells (n)"); ax[1].set_ylabel("recall@15 vs exact")
-    ax[1].set_title("Recall vs n (defaults)")
-    ax[1].grid(True, which="both", alpha=0.3); ax[1].legend()
+    # --- right: recall vs n ---
+    rp = [r["pipnn_recall"] for r in rows]
+    ry = [r["pynnd_recall"] for r in rows]
+    a1.plot(n, rp, "o-", color="#2a9d8f", label="PiPNN")
+    a1.plot(n, ry, "s-", color="#e76f51", label="pynndescent")
+    # Shade + label the recall gap at the largest n.
+    a1.fill_between(n, ry, rp, color="#2a9d8f", alpha=0.06)
+    a1.annotate(f"≈ +{(rp[-1]-ry[-1])*100:.0f} pts\nrecall", xy=(n[-1], (rp[-1] + ry[-1]) / 2),
+                xytext=(-4, 0), textcoords="offset points", ha="right", va="center",
+                fontsize=8.5, color="#444")
+    a1.set_xscale("log"); a1.set_ylim(0.55, 1.02)
+    a1.set_xlabel("cells (n)"); a1.set_ylabel("recall@15 vs exact")
+    a1.set_title("Recall vs n  (library defaults)")
+    a1.grid(True, which="both", alpha=0.3); a1.legend(loc="lower left", fontsize=9)
 
-    fig.suptitle("PiPNN vs pynndescent scaling (50-d, warm steady-state)", y=1.02)
+    fig.suptitle("PiPNN vs pynndescent — single-cell kNN graph build (50-d, warm steady-state, all cores)",
+                 y=1.03, fontsize=12)
     plt.tight_layout()
-    plt.savefig(HERE / "scaling.png", dpi=110, bbox_inches="tight")
+    plt.savefig(HERE / "scaling.png", dpi=120, bbox_inches="tight")
 
 
 if __name__ == "__main__":
