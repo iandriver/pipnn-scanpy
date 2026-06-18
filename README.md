@@ -112,8 +112,10 @@ constant cluster density, all cores.
 ![PiPNN vs pynndescent build-time and recall scaling, 5k–800k cells](bench/scaling.png)
 
 *Left: warm build time vs n (log-log). Solid = PiPNN now; dashed = PiPNN before
-this work's optimizations; the curve dropped ~4× at 800k. Right: recall@15 — PiPNN
-holds ≈1.0 at every size while pynndescent (defaults) falls to ~0.82.*
+this work's optimizations (~4× slower at 800k). The shaded band marks where PiPNN
+is the faster builder — up to the crossover at ~346k cells. Right: recall@15 —
+PiPNN holds ≈1.0 at every size while pynndescent (defaults) falls to ~0.82
+(≈ +16 points at scale).*
 
 | cells | PiPNN build | pynndescent build | speedup | PiPNN recall | pynndescent recall | peak RSS |
 |------:|------------:|------------------:|--------:|-------------:|-------------------:|---------:|
