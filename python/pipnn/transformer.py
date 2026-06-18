@@ -61,7 +61,7 @@ class PiPNNTransformer(TransformerMixin, BaseEstimator):
         l_max: int = 96,
         R: int = 64,
         alpha: float = 1.2,
-        beam_L: int = 100,
+        beam_L: int = 64,
         fanout: int = 2,
         c_min: int = 256,
         c_max: int = 2048,

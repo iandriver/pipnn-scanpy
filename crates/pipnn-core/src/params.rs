@@ -48,6 +48,6 @@ pub struct SearchParams {
 
 impl Default for SearchParams {
     fn default() -> Self {
-        SearchParams { beam_l: 100 }
+        SearchParams { beam_l: 64 }
     }
 }
