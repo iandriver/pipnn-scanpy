@@ -148,6 +148,30 @@ recall it must raise its build parameters, which narrows or erases the speed gap
 To trade PiPNN's recall for more speed, lower `beam_L` (e.g. 64 → 40 ≈ recall
 0.99) or set `PIPNN_QUERY=reservoir` (fastest, ~0.93 recall).
 
+### Matched-recall comparison
+
+The default-vs-default table above is not apples-to-apples on quality: pynndescent
+is running at recall ~0.82 there. pynndescent's recall *is* tunable — chiefly by
+building a wider graph (`n_neighbors` ≫ k, then keep the top-k), the direct analog
+of PiPNN's internal over-search. `bench/bench_matched_recall.py` tunes pynndescent
+up to PiPNN's recall and re-times it:
+
+| cells | PiPNN | pynndescent (default) | pynndescent (matched recall) | slowdown at matched recall |
+|------:|------:|----------------------:|-----------------------------:|---------------------------:|
+| 50k   | 0.29s @ 0.997 | 0.55s @ 0.82 | 1.08s @ 0.999 | **3.8×** |
+| 100k  | 0.58s @ 0.998 | 0.79s @ 0.83 | 2.09s @ 0.999 | **3.6×** |
+| 200k  | 1.25s @ 0.998 | 1.39s @ 0.83 | 4.58s @ 0.999 | **3.7×** |
+| 400k  | 2.52s @ 0.997 | 2.51s @ 0.83 | 9.90s @ 0.999 | **3.9×** |
+
+![Recall vs build time at 100k — PiPNN dominates pynndescent's quality curve](bench/matched_recall.png)
+
+**At equal recall (~0.999), PiPNN is ~3.6–3.9× faster than pynndescent at every
+size.** Note 400k: default-vs-default they *tie* (2.5s each) — but only because
+pynndescent is at 0.83 recall; hold it to 0.997 and it needs 9.9s. The Pareto plot
+(recall vs build time at 100k) shows PiPNN sitting in the upper-left "high recall,
+low time" corner while pynndescent must spend 3–5× the time climbing to the same
+recall.
+
 These build-time gains came from five **recall-neutral** optimizations, found by profiling
 (`PIPNN_PROFILE=1` prints per-stage timings), not guesswork:
 1. **Leaf candidate selection** via quickselect, replacing an `O(s²·ℓ_max)`
