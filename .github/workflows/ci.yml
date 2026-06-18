@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cargo tests (core crate)
+        run: cargo test -p pipnn-core --release
+
+      - name: Build extension + run Python tests
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --upgrade pip maturin
+          pip install numpy scipy scikit-learn scanpy anndata igraph leidenalg pynndescent pytest
+          maturin develop --release
+          pytest tests/ -q
