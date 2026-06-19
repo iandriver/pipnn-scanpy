@@ -215,6 +215,29 @@ speed at much higher recall than pynndescent's defaults. (HNSW's parallel build 
 non-deterministic, unlike PiPNN's; `HnswTransformer` exposes `m`, `ef_construction`,
 `ef_search` to trade recall for speed.)
 
+#### Full sweep (5k–800k)
+
+`bench/bench_pipnn_vs_hnsw.py` sweeps both across sizes (warm min-of-N, 50-d,
+defaults). Plot: `bench/pipnn_vs_hnsw.png`.
+
+![PiPNN vs native HNSW build-time and recall, 5k–800k](bench/pipnn_vs_hnsw.png)
+
+| cells | PiPNN | recall | HNSW | recall |
+|------:|------:|-------:|-----:|-------:|
+| 5k   | 0.06s | 1.000 | **0.03s** | 0.960 |
+| 25k  | **0.14s** | 1.000 | 0.18s | 0.989 |
+| 100k | **0.59s** | 0.998 | 0.75s | 0.959 |
+| 200k | **1.22s** | 0.998 | 1.54s | 0.919 |
+| 400k | **2.59s** | 0.997 | 3.20s | 0.883 |
+| 800k | **5.60s** | 0.997 | 6.55s | 0.881 |
+
+The **build-time curves nearly overlap** — HNSW is marginally faster below ~10k
+(less fixed overhead), PiPNN marginally faster from ~25k. The real separation is
+**recall**: PiPNN holds ≈1.0 at every size, while HNSW at fixed default `ef`
+**degrades with n** (0.99 → 0.88 by 400k) — the same recall-decay pattern as
+pynndescent's defaults. Raising HNSW's `ef_search`/`m` recovers recall at more time
+(its recall is a knob, not a ceiling); these are defaults-vs-defaults.
+
 #### Scalar quantization (SQ8) — and why it doesn't help here
 
 `HnswTransformer(quantize="sq8")` stores per-dimension **8-bit codes** (4× smaller
