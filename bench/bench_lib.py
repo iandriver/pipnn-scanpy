@@ -48,6 +48,12 @@ def available_backends(k: int, n_jobs: int = -1):
         pass
 
     try:
+        from pipnn.contrib import HnswTransformer
+        backends["hnsw"] = lambda: HnswTransformer(n_neighbors=k, n_jobs=n_jobs)
+    except Exception:
+        pass
+
+    try:
         from pipnn.contrib import GlassTransformer
         GlassTransformer._import_glass()  # probe importability (glassppy or glass)
         backends["glass"] = lambda: GlassTransformer(n_neighbors=k, n_jobs=n_jobs)

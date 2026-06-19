@@ -10,8 +10,8 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 use pipnn_core::{
-    build_index_with_cands, knn_self_bruteforce, knn_self_graph, knn_self_reservoir, BuildParams,
-    Dataset, Metric, SearchParams,
+    build_index_with_cands, knn_self_bruteforce, knn_self_graph, knn_self_hnsw, knn_self_reservoir,
+    BuildParams, Dataset, HnswParams, Metric, SearchParams,
 };
 
 /// Build the index and return self-kNN as flat arrays.
@@ -128,9 +128,61 @@ fn build_and_self_knn<'py>(
     ))
 }
 
+/// Build a compact HNSW index and return self-kNN — same `(indices, distances,
+/// stride)` layout as `build_and_self_knn`. A native graph-ANN comparison backend.
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (
+    x, n_neighbors, metric="euclidean",
+    m=16, ef_construction=200, ef_search=64, n_jobs=0, seed=0,
+))]
+fn hnsw_self_knn<'py>(
+    py: Python<'py>,
+    x: PyReadonlyArray2<'py, f32>,
+    n_neighbors: usize,
+    metric: &str,
+    m: usize,
+    ef_construction: usize,
+    ef_search: usize,
+    n_jobs: usize,
+    seed: u64,
+) -> PyResult<(Bound<'py, PyArray1<u32>>, Bound<'py, PyArray1<f32>>, usize)> {
+    let metric = Metric::parse(metric)
+        .ok_or_else(|| PyValueError::new_err(format!("unsupported metric: {metric}")))?;
+    let arr = x.as_array();
+    let (n, d) = (arr.shape()[0], arr.shape()[1]);
+    if n == 0 {
+        return Err(PyValueError::new_err("empty input matrix"));
+    }
+    let flat: Vec<f32> = arr.iter().copied().collect();
+    let hp = HnswParams { m, ef_construction, ef_search, seed };
+
+    let pool = if n_jobs > 0 {
+        rayon::ThreadPoolBuilder::new().num_threads(n_jobs).build().ok()
+    } else {
+        None
+    };
+
+    let knn = py.detach(|| {
+        let data = Dataset::new(&flat, n, d, metric);
+        let run = || knn_self_hnsw(&data, &hp, n_neighbors);
+        match &pool {
+            Some(p) => p.install(run),
+            None => run(),
+        }
+    });
+
+    Ok((
+        knn.indices.into_pyarray(py),
+        knn.distances.into_pyarray(py),
+        knn.stride,
+    ))
+}
+
 #[pymodule]
 fn _pipnn(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(build_and_self_knn, m)?)?;
+    m.add_function(wrap_pyfunction!(hnsw_self_knn, m)?)?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }
