@@ -1,16 +1,15 @@
 //! Compact HNSW (Malkov & Yashunin) — a native graph-ANN comparison backend.
 //!
-//! This is the core algorithm pyglass implements. We build it from scratch in
-//! Rust (pyglass's C++ does not compile on arm64) reusing the crate's pieces:
-//! the SIMD [`crate::metric::sq_l2`] kernel, and [`crate::robust_prune`] as the
-//! "select neighbors heuristic" (HNSW Alg 4 is exactly α=1 RobustPrune).
+//! The core algorithm pyglass implements, built from scratch in Rust (pyglass's
+//! C++ does not compile on arm64). Reuses the SIMD [`crate::metric::sq_l2`] kernel;
+//! the neighbor-selection heuristic is α=1 RobustPrune (HNSW Alg 4). Build is
+//! parallel (hnswlib-style concurrent insertion with per-node locks, never
+//! nested → deadlock-free); the query is lock-free.
 //!
-//! Build is parallel (hnswlib-style concurrent insertion with per-node locks), so
-//! the timing comparison against PiPNN is fair. Like all parallel HNSW builds it
-//! is non-deterministic (insertion order varies); the query side is lock-free.
-//!
-//! Layout: `links[node][layer]` is `node`'s neighbor list at `layer` (layer 0 is
-//! densest, degree bound `m0 = 2·m`; higher layers use `m`).
+//! **Scalar quantization (SQ8).** Optionally the graph is built and searched on
+//! per-dimension 8-bit codes ([`Sq8`]) — pyglass's trick: codes are 4× smaller
+//! than f32, so HNSW's random neighbor lookups touch far less cache. The returned
+//! neighbors' distances are always recomputed exactly for the output.
 
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
@@ -23,19 +22,25 @@ use rayon::prelude::*;
 
 use crate::bruteforce::SelfKnn;
 use crate::dataset::{Dataset, Id};
-use crate::robust_prune::robust_prune;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Quant {
+    None,
+    Sq8,
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct HnswParams {
     pub m: usize,
     pub ef_construction: usize,
     pub ef_search: usize,
+    pub quant: Quant,
     pub seed: u64,
 }
 
 impl Default for HnswParams {
     fn default() -> Self {
-        HnswParams { m: 16, ef_construction: 200, ef_search: 64, seed: 0 }
+        HnswParams { m: 16, ef_construction: 200, ef_search: 64, quant: Quant::None, seed: 0 }
     }
 }
 
@@ -47,6 +52,75 @@ impl HnswParams {
         } else {
             self.m
         }
+    }
+}
+
+/// Per-dimension 8-bit scalar quantizer. `code[i*d+k]` in `0..=255`; the squared
+/// distance is `Σ_k scale2[k]·(code_i[k] − code_j[k])²`.
+pub struct Sq8 {
+    codes: Vec<u8>,
+    scale2: Vec<f32>,
+    d: usize,
+}
+
+impl Sq8 {
+    pub fn new(data: &Dataset) -> Sq8 {
+        let (n, d) = (data.n, data.d);
+        let mut min = vec![f32::INFINITY; d];
+        let mut max = vec![f32::NEG_INFINITY; d];
+        for i in 0..n {
+            let row = data.row(i);
+            for k in 0..d {
+                if row[k] < min[k] {
+                    min[k] = row[k];
+                }
+                if row[k] > max[k] {
+                    max[k] = row[k];
+                }
+            }
+        }
+        let mut step = vec![1.0f32; d];
+        for k in 0..d {
+            let r = max[k] - min[k];
+            step[k] = if r > 0.0 { r / 255.0 } else { 1.0 };
+        }
+        let mut codes = vec![0u8; n * d];
+        for i in 0..n {
+            let row = data.row(i);
+            let out = &mut codes[i * d..(i + 1) * d];
+            for k in 0..d {
+                let q = ((row[k] - min[k]) / step[k]).round();
+                out[k] = q.clamp(0.0, 255.0) as u8;
+            }
+        }
+        let scale2 = step.iter().map(|&s| s * s).collect();
+        Sq8 { codes, scale2, d }
+    }
+
+    /// Approximate squared distance between two stored codes (SIMD `f32x8`).
+    #[inline]
+    pub fn dist(&self, i: usize, j: usize) -> f32 {
+        use wide::f32x8;
+        let d = self.d;
+        let ci = &self.codes[i * d..(i + 1) * d];
+        let cj = &self.codes[j * d..(j + 1) * d];
+        let mut acc = f32x8::ZERO;
+        let mut k = 0;
+        while k + 8 <= d {
+            let a = f32x8::from(std::array::from_fn::<f32, 8, _>(|t| ci[k + t] as f32));
+            let b = f32x8::from(std::array::from_fn::<f32, 8, _>(|t| cj[k + t] as f32));
+            let s = f32x8::from(<[f32; 8]>::try_from(&self.scale2[k..k + 8]).unwrap());
+            let dq = a - b;
+            acc += s * dq * dq;
+            k += 8;
+        }
+        let mut r = acc.reduce_add();
+        while k < d {
+            let dq = ci[k] as f32 - cj[k] as f32;
+            r += self.scale2[k] * dq * dq;
+            k += 1;
+        }
+        r
     }
 }
 
@@ -84,33 +158,34 @@ impl Visited {
     }
 }
 
-// Squared-L2 ≥ 0 → raw f32 bits are order-preserving; key the heaps by u32.
+// Squared distances ≥ 0 → raw f32 bits are order-preserving; key the heaps by u32.
 #[inline]
 fn key(d: f32) -> u32 {
     d.to_bits()
 }
 
-/// Greedy search at one `layer` from `entry_pts`, returning up to `ef` closest
-/// nodes to `q` as `(id, sq_dist)`. `nbrs(node, layer)` yields a node's neighbors
-/// (a clone, so it works for both the locked build graph and the plain query graph).
-fn search_layer<F>(
-    data: &Dataset,
-    q: &[f32],
+/// Greedy search at one `layer` from `entry_pts`. `dist(qid, cand)` is the
+/// distance from the fixed query point `qid` to a candidate; `nbrs(node, layer)`
+/// yields a node's neighbors. Returns up to `ef` closest `(id, dist)`.
+fn search_layer<D, N>(
+    dist: &D,
+    qid: usize,
     entry_pts: &[Id],
     ef: usize,
     layer: usize,
     vis: &mut Visited,
-    nbrs: &F,
+    nbrs: &N,
 ) -> Vec<(Id, f32)>
 where
-    F: Fn(usize, usize) -> Vec<Id>,
+    D: Fn(usize, usize) -> f32,
+    N: Fn(usize, usize) -> Vec<Id>,
 {
     vis.reset();
     let mut cand: BinaryHeap<Reverse<(u32, Id)>> = BinaryHeap::new();
     let mut w: BinaryHeap<(u32, Id)> = BinaryHeap::new();
 
     for &ep in entry_pts {
-        let d = data.sq_dist_to(ep as usize, q);
+        let d = dist(qid, ep as usize);
         vis.visit(ep as usize);
         cand.push(Reverse((key(d), ep)));
         w.push((key(d), ep));
@@ -129,7 +204,7 @@ where
             if !vis.visit(ei) {
                 continue;
             }
-            let d = data.sq_dist_to(ei, q);
+            let d = dist(qid, ei);
             let worst = w.peek().map(|&(wd, _)| wd).unwrap_or(u32::MAX);
             if w.len() < ef || key(d) < worst {
                 cand.push(Reverse((key(d), e)));
@@ -141,6 +216,30 @@ where
         }
     }
     w.into_iter().map(|(k, id)| (id, f32::from_bits(k))).collect()
+}
+
+/// HNSW select-neighbors heuristic (Alg 4, α=1): keep the `m` closest candidates
+/// to `q`, skipping any candidate already "covered" by a closer selected one.
+fn select_neighbors<D: Fn(usize, usize) -> f32>(
+    dist: &D,
+    q: usize,
+    cands: &mut Vec<(Id, f32)>,
+    m: usize,
+) -> Vec<Id> {
+    cands.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap().then(a.0.cmp(&b.0)));
+    let mut out: Vec<Id> = Vec::with_capacity(m);
+    for &(c, dc) in cands.iter() {
+        if c as usize == q {
+            continue;
+        }
+        if out.len() >= m {
+            break;
+        }
+        if out.iter().all(|&s| dist(s as usize, c as usize) >= dc) {
+            out.push(c);
+        }
+    }
+    out
 }
 
 #[inline]
@@ -155,24 +254,23 @@ fn random_layer(rng: &mut ChaCha8Rng, ml: f64) -> usize {
 }
 
 impl Hnsw {
-    /// Build the HNSW index over `data` with parallel insertion.
-    pub fn build(data: &Dataset, p: &HnswParams) -> Hnsw {
-        let n = data.n;
+    /// Build the HNSW with parallel insertion, using `dist(a, b)` for all distances.
+    pub fn build<D>(n: usize, p: &HnswParams, dist: &D) -> Hnsw
+    where
+        D: Fn(usize, usize) -> f32 + Sync,
+    {
         if n == 0 {
             return Hnsw { links: Vec::new(), entry: 0, max_layer: 0 };
         }
 
-        // Per-node top layer, fixed up-front (seeded) so layer assignment is stable.
         let mut rng = ChaCha8Rng::seed_from_u64(p.seed ^ 0x484E_5357_u64);
         let ml = 1.0f64 / (p.m as f64).ln();
         let node_layer: Vec<usize> = (0..n).map(|_| random_layer(&mut rng, ml)).collect();
 
-        // Locked adjacency for concurrent insertion; converted to plain Vecs after.
         let blinks: Vec<Vec<Mutex<Vec<Id>>>> = node_layer
             .iter()
             .map(|&l| (0..=l).map(|_| Mutex::new(Vec::new())).collect())
             .collect();
-        // Global entry point + its layer.
         let entry_state = RwLock::new((0u32, node_layer[0]));
 
         // Neighbor accessor for the build graph: lock, clone, unlock (one lock at
@@ -181,47 +279,41 @@ impl Hnsw {
             blinks[node][layer].lock().unwrap().clone()
         };
 
-        // Insert nodes 1..n in parallel (node 0 is the initial entry, no edges).
         (1..n).into_par_iter().for_each_init(
             || Visited::new(n),
             |vis, node| {
-                let q = data.row(node);
                 let (mut ep, max_layer) = *entry_state.read().unwrap();
                 let l = node_layer[node];
 
-                // Descend layers above l (ef = 1).
                 let mut lc = max_layer;
                 while lc > l {
-                    let w = search_layer(data, q, &[ep], 1, lc, vis, &nbrs);
+                    let w = search_layer(dist, node, &[ep], 1, lc, vis, &nbrs);
                     if let Some(id) = nearest(&w) {
                         ep = id;
                     }
-                    lc = lc.saturating_sub(1);
-                    if lc == 0 && l == 0 {
+                    if lc == 0 {
                         break;
                     }
+                    lc -= 1;
                 }
 
-                // Connect from min(l, max_layer) down to 0.
                 for lc in (0..=l.min(max_layer)).rev() {
-                    let w = search_layer(data, q, &[ep], p.ef_construction, lc, vis, &nbrs);
+                    let w = search_layer(dist, node, &[ep], p.ef_construction, lc, vis, &nbrs);
                     let m = p.m_at(lc);
                     let mut cands = w.clone();
-                    let selected = robust_prune(data, node as Id, &mut cands, 1.0, m);
+                    let selected = select_neighbors(dist, node, &mut cands, m);
 
-                    // Set this node's own links (drop the guard before touching others).
                     *blinks[node][lc].lock().unwrap() = selected.clone();
 
-                    // Backward links + prune over-full neighbors, one lock at a time.
                     for &nb in &selected {
                         let mut nbl = blinks[nb as usize][lc].lock().unwrap();
                         nbl.push(node as Id);
                         if nbl.len() > m {
                             let mut nbc: Vec<(Id, f32)> = nbl
                                 .iter()
-                                .map(|&e| (e, data.sq_dist(nb as usize, e as usize)))
+                                .map(|&e| (e, dist(nb as usize, e as usize)))
                                 .collect();
-                            *nbl = robust_prune(data, nb, &mut nbc, 1.0, m);
+                            *nbl = select_neighbors(dist, nb as usize, &mut nbc, m);
                         }
                     }
 
@@ -230,7 +322,6 @@ impl Hnsw {
                     }
                 }
 
-                // Promote the entry point if this node reaches a new top layer.
                 if l > max_layer {
                     let mut g = entry_state.write().unwrap();
                     if l > g.1 {
@@ -240,7 +331,6 @@ impl Hnsw {
             },
         );
 
-        // Freeze into the lock-free query structure.
         let links: Vec<Vec<Vec<Id>>> = blinks
             .into_iter()
             .map(|layers| layers.into_iter().map(|mx| mx.into_inner().unwrap()).collect())
@@ -249,19 +339,22 @@ impl Hnsw {
         Hnsw { links, entry, max_layer }
     }
 
-    /// k nearest neighbors of `q` (as `(id, sq_dist)`, ascending).
-    fn search(&self, data: &Dataset, q: &[f32], k: usize, ef: usize, vis: &mut Visited) -> Vec<(Id, f32)> {
+    /// Top-`k` neighbors of query point `qid` (`(id, dist)`, ascending), by `dist`.
+    fn search<D>(&self, dist: &D, qid: usize, k: usize, ef: usize, vis: &mut Visited) -> Vec<(Id, f32)>
+    where
+        D: Fn(usize, usize) -> f32,
+    {
         let nbrs = |node: usize, layer: usize| -> Vec<Id> { self.links[node][layer].clone() };
         let mut ep = self.entry;
         let mut lc = self.max_layer;
         while lc >= 1 {
-            let w = search_layer(data, q, &[ep], 1, lc, vis, &nbrs);
+            let w = search_layer(dist, qid, &[ep], 1, lc, vis, &nbrs);
             if let Some(id) = nearest(&w) {
                 ep = id;
             }
             lc -= 1;
         }
-        let mut w = search_layer(data, q, &[ep], ef.max(k), 0, vis, &nbrs);
+        let mut w = search_layer(dist, qid, &[ep], ef.max(k), 0, vis, &nbrs);
         w.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap().then(a.0.cmp(&b.0)));
         w.truncate(k);
         w
@@ -269,10 +362,25 @@ impl Hnsw {
 }
 
 /// Self-kNN over a freshly built HNSW index, in the transformer's `SelfKnn` layout.
+/// With `Quant::Sq8`, the graph is built/searched on 8-bit codes; the emitted
+/// neighbor distances are always recomputed exactly.
 pub fn knn_self_hnsw(data: &Dataset, p: &HnswParams, k: usize) -> SelfKnn {
+    match p.quant {
+        Quant::Sq8 => {
+            let q = Sq8::new(data);
+            build_and_query(data, p, k, &|a, b| q.dist(a, b))
+        }
+        Quant::None => build_and_query(data, p, k, &|a, b| data.sq_dist(a, b)),
+    }
+}
+
+fn build_and_query<D>(data: &Dataset, p: &HnswParams, k: usize, dist: &D) -> SelfKnn
+where
+    D: Fn(usize, usize) -> f32 + Sync,
+{
     let n = data.n;
     let stride = (k + 1).min(n.max(1));
-    let hnsw = Hnsw::build(data, p);
+    let hnsw = Hnsw::build(n, p, dist);
     let ef = p.ef_search.max(stride);
 
     let mut indices = vec![0 as Id; n * stride];
@@ -285,14 +393,16 @@ pub fn knn_self_hnsw(data: &Dataset, p: &HnswParams, k: usize) -> SelfKnn {
         .map_init(
             || Visited::new(n),
             |vis, (i, (idx_row, dist_row))| {
-                let mut res = hnsw.search(data, data.row(i), stride, ef, vis);
+                // Search returns candidates by the build metric (possibly SQ8);
+                // re-rank/emit with EXACT distances.
+                let cands = hnsw.search(dist, i, stride, ef, vis);
+                let mut res: Vec<(Id, f32)> =
+                    cands.iter().map(|&(id, _)| (id, data.sq_dist(i, id as usize))).collect();
                 if !res.iter().any(|&(id, _)| id as usize == i) {
-                    res.insert(0, (i as Id, 0.0));
+                    res.push((i as Id, 0.0));
                 }
-                if let Some(pos) = res.iter().position(|&(id, _)| id as usize == i) {
-                    let s = res.remove(pos);
-                    res.insert(0, s);
-                }
+                res.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap().then(a.0.cmp(&b.0)));
+                // Self (dist 0) is now first.
                 res.truncate(stride);
                 while res.len() < stride {
                     res.push((i as Id, 0.0));

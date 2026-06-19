@@ -66,3 +66,24 @@ def test_recall_vs_exact(name, make, data):
     exact = exact[:, 1:]
     recall = np.mean([len(set(approx[i]) & set(exact[i])) / k for i in range(n)])
     assert recall >= 0.90, f"{name}: recall {recall:.3f} too low"
+
+
+def test_hnsw_sq8_contract_and_recall(data):
+    """The SQ8-quantized HNSW path (not in the default registry) still satisfies
+    the CSR contract and reaches usable recall."""
+    from pipnn.contrib import HnswTransformer
+
+    k = 15
+    g = HnswTransformer(n_neighbors=k, quantize="sq8").fit_transform(data)
+    n = data.shape[0]
+    assert g.shape == (n, n)
+    assert np.all(np.diff(g.indptr) == k + 1)
+    approx = np.full((n, k), -1, dtype=np.int64)
+    for i in range(n):
+        s, e = g.indptr[i], g.indptr[i + 1]
+        order = np.argsort(g.data[s:e])
+        approx[i] = [c for c in g.indices[s:e][order] if c != i][:k]
+    _, exact = NearestNeighbors(n_neighbors=k + 1).fit(data).kneighbors(data)
+    exact = exact[:, 1:]
+    recall = np.mean([len(set(approx[i]) & set(exact[i])) / k for i in range(n)])
+    assert recall >= 0.85, f"sq8 recall {recall:.3f} too low"
