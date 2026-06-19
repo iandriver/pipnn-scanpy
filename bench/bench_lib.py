@@ -50,6 +50,9 @@ def available_backends(k: int, n_jobs: int = -1):
     try:
         from pipnn.contrib import HnswTransformer
         backends["hnsw"] = lambda: HnswTransformer(n_neighbors=k, n_jobs=n_jobs)
+        # hnsw-sq8 (quantize="sq8") is available but not auto-registered: at
+        # single-cell PCA dims it trades recall for 4× less vector memory without
+        # a speed win (see README), so it would only slow the default comparison.
     except Exception:
         pass
 

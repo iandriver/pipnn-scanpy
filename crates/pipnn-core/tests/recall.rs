@@ -2,7 +2,7 @@
 
 use pipnn_core::{
     build_index, knn_self_bruteforce, knn_self_graph, knn_self_hnsw, BuildParams, Dataset,
-    HnswParams, Metric, SearchParams,
+    HnswParams, Metric, Quant, SearchParams,
 };
 
 fn synth(n: usize, d: usize, seed: u64) -> Vec<f32> {
@@ -67,6 +67,21 @@ fn recall_hnsw_vs_bruteforce() {
     let r = recall_at_k(&approx.indices, &exact.indices, n, approx.stride);
     println!("hnsw recall@{k} = {r:.4}");
     assert!(r >= 0.95, "hnsw recall {r:.4} too low");
+}
+
+#[test]
+fn recall_hnsw_sq8_vs_bruteforce() {
+    let (n, d, k) = (10000usize, 50usize, 15usize);
+    let flat = gaussian(n, d, 1);
+    let data = Dataset::new(&flat, n, d, Metric::L2);
+    let p = HnswParams { quant: Quant::Sq8, ..HnswParams::default() };
+
+    let approx = knn_self_hnsw(&data, &p, k);
+    let exact = knn_self_bruteforce(&data, k);
+    let r = recall_at_k(&approx.indices, &exact.indices, n, approx.stride);
+    println!("hnsw-sq8 recall@{k} = {r:.4}");
+    // SQ8 trades a little recall for memory/cache efficiency.
+    assert!(r >= 0.90, "hnsw-sq8 recall {r:.4} too low");
 }
 
 #[test]

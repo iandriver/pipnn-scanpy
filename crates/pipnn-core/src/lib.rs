@@ -24,6 +24,6 @@ pub use build::{build_index, build_index_with_cands};
 pub use dataset::{Dataset, Id};
 pub use graph::Graph;
 pub use hashprune::{Hyperplanes, Reservoir};
-pub use hnsw::{knn_self_hnsw, Hnsw, HnswParams};
+pub use hnsw::{knn_self_hnsw, Hnsw, HnswParams, Quant};
 pub use metric::Metric;
 pub use params::{BuildParams, SearchParams};

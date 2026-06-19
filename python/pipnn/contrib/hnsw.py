@@ -38,6 +38,10 @@ class HnswTransformer(TransformerMixin, BaseEstimator):
         Candidate-list width during build (higher = better recall, slower).
     ef_search : int
         Candidate-list width during query (clamped to ``>= n_neighbors + 1``).
+    quantize : {"none", "sq8"}
+        ``"sq8"`` builds/searches on per-dimension 8-bit codes (4× smaller
+        vectors, pyglass-style) — faster/leaner, slightly lower recall. Emitted
+        distances are always exact.
     n_jobs : int
         Thread count for the query (``-1``/``0`` = all cores).
     random_state : int
@@ -52,6 +56,7 @@ class HnswTransformer(TransformerMixin, BaseEstimator):
         m: int = 16,
         ef_construction: int = 200,
         ef_search: int = 64,
+        quantize: str = "none",
         n_jobs: int = -1,
         random_state: int = 0,
     ):
@@ -60,6 +65,7 @@ class HnswTransformer(TransformerMixin, BaseEstimator):
         self.m = m
         self.ef_construction = ef_construction
         self.ef_search = ef_search
+        self.quantize = quantize
         self.n_jobs = n_jobs
         self.random_state = random_state
 
@@ -72,7 +78,7 @@ class HnswTransformer(TransformerMixin, BaseEstimator):
         idx, dist, stride = _pipnn.hnsw_self_knn(
             X, int(self.n_neighbors), str(self.metric),
             int(self.m), int(self.ef_construction), int(self.ef_search),
-            int(n_jobs), int(self.random_state),
+            str(self.quantize), int(n_jobs), int(self.random_state),
         )
         self._indices = idx
         self._distances = dist

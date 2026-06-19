@@ -11,7 +11,7 @@ use pyo3::prelude::*;
 
 use pipnn_core::{
     build_index_with_cands, knn_self_bruteforce, knn_self_graph, knn_self_hnsw, knn_self_reservoir,
-    BuildParams, Dataset, HnswParams, Metric, SearchParams,
+    BuildParams, Dataset, HnswParams, Metric, Quant, SearchParams,
 };
 
 /// Build the index and return self-kNN as flat arrays.
@@ -134,7 +134,7 @@ fn build_and_self_knn<'py>(
 #[allow(clippy::too_many_arguments)]
 #[pyo3(signature = (
     x, n_neighbors, metric="euclidean",
-    m=16, ef_construction=200, ef_search=64, n_jobs=0, seed=0,
+    m=16, ef_construction=200, ef_search=64, quantize="none", n_jobs=0, seed=0,
 ))]
 fn hnsw_self_knn<'py>(
     py: Python<'py>,
@@ -144,18 +144,24 @@ fn hnsw_self_knn<'py>(
     m: usize,
     ef_construction: usize,
     ef_search: usize,
+    quantize: &str,
     n_jobs: usize,
     seed: u64,
 ) -> PyResult<(Bound<'py, PyArray1<u32>>, Bound<'py, PyArray1<f32>>, usize)> {
     let metric = Metric::parse(metric)
         .ok_or_else(|| PyValueError::new_err(format!("unsupported metric: {metric}")))?;
+    let quant = match quantize.to_ascii_lowercase().as_str() {
+        "none" | "fp32" | "" => Quant::None,
+        "sq8" => Quant::Sq8,
+        other => return Err(PyValueError::new_err(format!("unsupported quantize: {other}"))),
+    };
     let arr = x.as_array();
     let (n, d) = (arr.shape()[0], arr.shape()[1]);
     if n == 0 {
         return Err(PyValueError::new_err("empty input matrix"));
     }
     let flat: Vec<f32> = arr.iter().copied().collect();
-    let hp = HnswParams { m, ef_construction, ef_search, seed };
+    let hp = HnswParams { m, ef_construction, ef_search, quant, seed };
 
     let pool = if n_jobs > 0 {
         rayon::ThreadPoolBuilder::new().num_threads(n_jobs).build().ok()

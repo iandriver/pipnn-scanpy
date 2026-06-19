@@ -215,6 +215,27 @@ speed at much higher recall than pynndescent's defaults. (HNSW's parallel build 
 non-deterministic, unlike PiPNN's; `HnswTransformer` exposes `m`, `ef_construction`,
 `ef_search` to trade recall for speed.)
 
+#### Scalar quantization (SQ8) — and why it doesn't help here
+
+`HnswTransformer(quantize="sq8")` stores per-dimension **8-bit codes** (4× smaller
+than f32) and builds/searches on them — pyglass's core speed trick. It's correctly
+implemented (emitted distances are always recomputed exactly), but on single-cell
+data it is **not** worth it:
+
+| n=100k | exact f32 | SQ8 | | vector memory |
+|---|---|---|---|---|
+| d=50  | 0.79s @ 0.977 | 1.09s @ 0.912 | (slower, lower recall) | 20 MB → 5 MB |
+| d=256 | 2.43s @ 0.940 | 3.96s @ 0.878 | (slower, lower recall) | 102 MB → 26 MB |
+
+SQ8 cuts vector memory 4× but is **slower** at both dims. The reason is
+fundamental to a *portable* implementation: our exact path is a tight `f32x8` SIMD
+kernel over contiguous floats, whereas SQ8 needs a scalar `u8 → f32` gather per
+block (portable SIMD can't widen `u8` lanes without arch-specific NEON/AVX
+intrinsics), and the memory saving doesn't overcome that. SQ8's real wins
+(pyglass/FAISS) come from hand-tuned integer kernels at very high `d` / billion
+scale. **Takeaway for single-cell:** at PCA dimensions, exact SIMD f32 beats
+quantization on *both* speed and recall — which is why PiPNN uses exact distances.
+
 ## Metrics
 
 `euclidean` (default, matches scanpy on PCA space) and `cosine`.
