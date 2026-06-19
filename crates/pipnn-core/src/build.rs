@@ -25,6 +25,7 @@ pub fn build_index(data: &Dataset, p: &BuildParams) -> Graph {
 /// `m_cands == 0`). These are each point's nearest in-build candidates — the
 /// direct, high-recall answer to *self*-kNN, before RobustPrune discards the
 /// close-but-redundant ones for navigability. See [`crate::batch_query::knn_self_reservoir`].
+#[allow(unused_assignments)] // final `lap!` reassigns the timer it never reads
 pub fn build_index_with_cands(
     data: &Dataset,
     p: &BuildParams,

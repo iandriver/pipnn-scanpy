@@ -1,6 +1,9 @@
 //! Recall of the PiPNN graph self-kNN vs exact brute force on synthetic data.
 
-use pipnn_core::{build_index, knn_self_bruteforce, knn_self_graph, BuildParams, Dataset, Metric, SearchParams};
+use pipnn_core::{
+    build_index, knn_self_bruteforce, knn_self_graph, knn_self_hnsw, BuildParams, Dataset,
+    HnswParams, Metric, SearchParams,
+};
 
 fn synth(n: usize, d: usize, seed: u64) -> Vec<f32> {
     // Simple deterministic LCG-based pseudo-gaussian-ish data.
@@ -49,6 +52,21 @@ fn gaussian(n: usize, d: usize, seed: u64) -> Vec<f32> {
         i += 2;
     }
     v
+}
+
+#[test]
+fn recall_hnsw_vs_bruteforce() {
+    let (n, d, k) = (10000usize, 50usize, 15usize);
+    let flat = gaussian(n, d, 1);
+    let data = Dataset::new(&flat, n, d, Metric::L2);
+    let p = HnswParams::default();
+
+    let approx = knn_self_hnsw(&data, &p, k);
+    let exact = knn_self_bruteforce(&data, k);
+    assert_eq!(approx.stride, exact.stride);
+    let r = recall_at_k(&approx.indices, &exact.indices, n, approx.stride);
+    println!("hnsw recall@{k} = {r:.4}");
+    assert!(r >= 0.95, "hnsw recall {r:.4} too low");
 }
 
 #[test]

@@ -6,5 +6,6 @@ notebook. Each import is optional and raises a clear error only when used.
 """
 
 from .glass import GlassTransformer
+from .hnsw import HnswTransformer
 
-__all__ = ["GlassTransformer"]
+__all__ = ["GlassTransformer", "HnswTransformer"]

@@ -188,6 +188,33 @@ These build-time gains came from five **recall-neutral** optimizations, found by
    touched entries, warm-started from each point's reservoir candidates. Cut the
    800k query ~2×.
 
+### Native HNSW backend (three-way comparison)
+
+pyglass (HNSW/NSG) can't run on arm64 macOS, so for a real graph-ANN comparison we
+also ship a compact **HNSW** built natively in the Rust crate — the algorithm
+pyglass implements — reusing the SIMD kernel, RobustPrune (α=1 = HNSW's neighbor
+heuristic), and a parallel hnswlib-style concurrent build. Use it like any backend:
+
+```python
+from pipnn.contrib import HnswTransformer
+sc.pp.neighbors(adata, n_neighbors=15, transformer=HnswTransformer())
+```
+
+It's auto-included in `bench/bench_lib.py`, giving PiPNN vs HNSW vs pynndescent vs
+exact on the same hardware (warm steady-state, 50-d, library defaults):
+
+| backend | 50k build | recall | 100k build | recall |
+|---|---|---|---|---|
+| **PiPNN** | **0.34s** | **0.997** | **0.69s** | **0.998** |
+| HNSW (this crate) | 0.43s | 0.982 | 0.83s | 0.943 |
+| pynndescent | 0.62s | 0.817 | 0.89s | 0.826 |
+| exact | 0.62s | 1.000 | 2.35s | 1.000 |
+
+PiPNN is fastest *and* highest-recall; our HNSW lands in between — competitive
+speed at much higher recall than pynndescent's defaults. (HNSW's parallel build is
+non-deterministic, unlike PiPNN's; `HnswTransformer` exposes `m`, `ef_construction`,
+`ef_search` to trade recall for speed.)
+
 ## Metrics
 
 `euclidean` (default, matches scanpy on PCA space) and `cosine`.
