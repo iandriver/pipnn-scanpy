@@ -26,6 +26,6 @@ jobs:
           python -m venv .venv
           . .venv/bin/activate
           python -m pip install --upgrade pip maturin
-          pip install numpy scipy scikit-learn scanpy anndata igraph leidenalg pynndescent pytest
+          pip install numpy scipy scikit-learn scanpy anndata igraph leidenalg pynndescent faiss-cpu pytest
           maturin develop --release
           pytest tests/ -q

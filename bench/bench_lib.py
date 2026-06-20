@@ -57,6 +57,18 @@ def available_backends(k: int, n_jobs: int = -1):
         pass
 
     try:
+        from pipnn.contrib import FaissTransformer
+        import faiss  # noqa: F401  (probe importability)
+        backends["faiss-hnsw"] = lambda: FaissTransformer(
+            n_neighbors=k, n_jobs=n_jobs, index_type="hnsw")
+        backends["faiss-ivfpq"] = lambda: FaissTransformer(
+            n_neighbors=k, n_jobs=n_jobs, index_type="ivfpq")
+        # faiss-flat (exact, BLAS) available via index_type="flat" but not
+        # auto-registered — sklearn `exact` already covers the exact baseline.
+    except Exception:
+        pass
+
+    try:
         from pipnn.contrib import GlassTransformer
         GlassTransformer._import_glass()  # probe importability (glassppy or glass)
         backends["glass"] = lambda: GlassTransformer(n_neighbors=k, n_jobs=n_jobs)
