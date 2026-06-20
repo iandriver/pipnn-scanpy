@@ -65,7 +65,31 @@ def test_recall_vs_exact(name, make, data):
     _, exact = NearestNeighbors(n_neighbors=k + 1).fit(data).kneighbors(data)
     exact = exact[:, 1:]
     recall = np.mean([len(set(approx[i]) & set(exact[i])) / k for i in range(n)])
-    assert recall >= 0.90, f"{name}: recall {recall:.3f} too low"
+    # IVF-PQ is a *lossy* product-quantized index — expected lower recall (its
+    # value is speed/memory, not accuracy); other backends should be high.
+    floor = 0.50 if "ivfpq" in name else 0.90
+    assert recall >= floor, f"{name}: recall {recall:.3f} below {floor}"
+
+
+def test_faiss_flat_exact(data):
+    """faiss-flat (IndexFlatL2) is exact → recall ≈ 1.0; also checks the contract."""
+    faiss = pytest.importorskip("faiss")
+    from pipnn.contrib import FaissTransformer
+
+    k = 15
+    g = FaissTransformer(n_neighbors=k, index_type="flat").fit_transform(data)
+    n = data.shape[0]
+    assert g.shape == (n, n)
+    assert np.all(np.diff(g.indptr) == k + 1)
+    approx = np.full((n, k), -1, dtype=np.int64)
+    for i in range(n):
+        s, e = g.indptr[i], g.indptr[i + 1]
+        order = np.argsort(g.data[s:e])
+        approx[i] = [c for c in g.indices[s:e][order] if c != i][:k]
+    _, exact = NearestNeighbors(n_neighbors=k + 1).fit(data).kneighbors(data)
+    exact = exact[:, 1:]
+    recall = np.mean([len(set(approx[i]) & set(exact[i])) / k for i in range(n)])
+    assert recall >= 0.99, f"faiss-flat recall {recall:.3f} not exact"
 
 
 def test_hnsw_sq8_contract_and_recall(data):

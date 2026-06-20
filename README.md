@@ -259,6 +259,39 @@ intrinsics), and the memory saving doesn't overcome that. SQ8's real wins
 scale. **Takeaway for single-cell:** at PCA dimensions, exact SIMD f32 beats
 quantization on *both* speed and recall — which is why PiPNN uses exact distances.
 
+### FAISS cross-comparison
+
+[FAISS](https://github.com/facebookresearch/faiss) is the industry-standard
+similarity-search library; `faiss-cpu` ships native arm64 wheels, so it plugs in
+as-is via `FaissTransformer` (`pipnn.contrib`) with `index_type` ∈ `{hnsw, ivfpq,
+flat}`. This is a battle-tested cross-check. One run (`bench/bench_xcompare.py`,
+n=100k, 50-d, warm steady-state, all cores):
+
+![FAISS cross-comparison: build time and recall](bench/xcompare.png)
+
+| backend | warm build | recall@15 |
+|---|---|---|
+| **PiPNN** | **0.72s** | 0.998 |
+| HNSW (this crate) | 0.85s | 0.980 |
+| FAISS HNSW | 1.22s | 0.985 |
+| FAISS IVF-PQ | 2.45s | 0.661 |
+| FAISS Flat (exact, BLAS) | 2.79s | 1.000 |
+| pynndescent | 1.00s | 0.824 |
+| exact (sklearn) | 2.44s | 1.000 |
+
+Three takeaways:
+1. **PiPNN is the fastest** of all seven at ~0.998 recall.
+2. **Our HNSW edges out FAISS's HNSW** here (0.85s vs 1.22s at comparable recall) —
+   a useful validation that our native HNSW and PiPNN are in the right ballpark
+   against the reference implementation.
+3. **FAISS IVF-PQ confirms the SQ8 finding**: product quantization is *not* a win at
+   PCA dimensions — at defaults it's both slower (clustering/training overhead) and
+   much lower recall (0.66). Quantization pays off at far higher `d` / billion scale,
+   not single-cell PCA. FAISS Flat (BLAS exact) matches sklearn exact.
+
+`faiss-hnsw` and `faiss-ivfpq` auto-register in `bench/bench_lib.py` whenever
+`faiss` is installed; `faiss-flat` is available via `index_type="flat"`.
+
 ## Metrics
 
 `euclidean` (default, matches scanpy on PCA space) and `cosine`.
