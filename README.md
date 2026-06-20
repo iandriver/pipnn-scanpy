@@ -292,6 +292,37 @@ Three takeaways:
 `faiss-hnsw` and `faiss-ivfpq` auto-register in `bench/bench_lib.py` whenever
 `faiss` is installed; `faiss-flat` is available via `index_type="flat"`.
 
+### Graph-ANN scaling: all four methods (5k–800k)
+
+The single-size cross-check above, run as a full sweep
+(`bench/bench_scaling_all.py`, 50-d, warm min-of-N build, recall@15 vs exact on a
+4000-point subsample, library defaults):
+
+![Graph-ANN scaling: PiPNN vs HNSW vs FAISS HNSW vs pynndescent](bench/scaling_all.png)
+
+| n | PiPNN | HNSW (ours) | FAISS HNSW | pynndescent |
+|---|---|---|---|---|
+| 5,000 | 0.06s / 1.000 | 0.03s / 0.966 | 0.03s / 0.999 | 0.46s / 0.974 |
+| 10,000 | 0.08s / 1.000 | 0.06s / 0.982 | 0.08s / 0.998 | 0.40s / 0.941 |
+| 25,000 | 0.13s / 1.000 | 0.16s / 0.986 | 0.22s / 0.992 | 0.47s / 0.867 |
+| 50,000 | 0.29s / 0.997 | 0.36s / 0.983 | 0.52s / 0.984 | 0.58s / 0.816 |
+| 100,000 | 0.59s / 0.998 | 0.71s / 0.940 | 1.08s / 0.984 | 0.81s / 0.825 |
+| 200,000 | 1.25s / 0.998 | 1.46s / 0.933 | 2.39s / 0.975 | 1.38s / 0.831 |
+| 400,000 | 2.61s / 0.997 | 3.09s / 0.905 | 5.28s / 0.975 | 2.55s / 0.829 |
+| 800,000 | 5.22s / 0.997 | 6.17s / 0.856 | 18.52s / 0.976 | 4.82s / 0.838 |
+
+*(cells show `warm build time / recall@15`.)*
+
+Reading the sweep:
+- **PiPNN holds ~0.997–1.000 recall across the whole range** while staying the
+  fastest or tied-fastest graph build — it never trades accuracy for scale.
+- **FAISS HNSW is the most robust of the approximate methods** (recall stays
+  ~0.975–0.99 even at 800k) but pays for it in build time, ending ~3.5× slower than
+  PiPNN at 800k.
+- **Our HNSW and pynndescent both decay at scale on default settings** (HNSW
+  0.99→0.86, pynndescent →0.84) — they'd need larger `ef`/`n_neighbors` to hold
+  recall, which costs the time advantage. PiPNN needs no such tuning.
+
 ## Metrics
 
 `euclidean` (default, matches scanpy on PCA space) and `cosine`.
