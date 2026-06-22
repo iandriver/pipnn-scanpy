@@ -19,7 +19,7 @@ dependencies = [
 [project.optional-dependencies]
 scanpy = ["scanpy>=1.10", "anndata>=0.9"]
 test = ["pytest>=7", "scanpy>=1.10", "pynndescent>=0.5"]
-bench = ["pynndescent>=0.5", "faiss-cpu>=1.8", "matplotlib>=3.5"]
+bench = ["pynndescent>=0.5", "faiss-cpu>=1.8", "matplotlib>=3.5", "h5py>=3.6"]
 
 [tool.maturin]
 # Mixed Rust/Python layout: pure-Python package lives under python/pipnn,

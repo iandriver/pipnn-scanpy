@@ -42,76 +42,100 @@ pub fn build_index_with_cands(
     macro_rules! lap {
         ($label:expr, $t:expr) => {
             if prof {
-                eprintln!("[pipnn] {:<14} {:>7.3}s", $label, $t.elapsed().as_secs_f64());
+                eprintln!(
+                    "[pipnn] {:<14} {:>7.3}s",
+                    $label,
+                    $t.elapsed().as_secs_f64()
+                );
                 $t = std::time::Instant::now();
             }
         };
     }
     let mut t = mark;
 
-    // Alg 4 line 2: partition into overlapping leaves.
-    let leaves = partition(data, p);
-    if prof {
-        let tot: usize = leaves.iter().map(|l| l.len()).sum();
-        eprintln!("[pipnn] leaves={} repl={:.2}x", leaves.len(), tot as f64 / n as f64);
-    }
-    lap!("partition", t);
-
-    // HashPrune setup: hyperplanes + precomputed sketch S = X·Hᵀ (n × m).
+    // HashPrune setup: hyperplanes + precomputed sketch S = X·Hᵀ (n × m). The
+    // sketch is a function of the points only, so it is shared across all runs.
     let hp = Hyperplanes::new(p.m, data.d, p.seed);
     let sketch = hp.sketch_all(data);
     let m = p.m;
     let cand_cap = p.l_max;
     lap!("sketch", t);
 
-    // Alg 4 lines 3–5 ("Pick" + "Prune_And_Add_Edges"): stream each leaf's
-    // candidate edges directly into per-point HashPrune reservoirs. The reservoir
-    // is the only persistent state (8·ℓ_max·n bytes) — we never materialize the
-    // full candidate-edge list, which would dwarf it. HashPrune is
-    // history-independent, so the per-leaf insertion order under lock contention
-    // does not affect the final reservoir contents (build stays deterministic).
-    let reservoirs: Vec<Mutex<Reservoir>> =
-        (0..n).map(|_| Mutex::new(Reservoir::new(p.l_max))).collect();
+    // Per-point HashPrune reservoirs — the only persistent state (8·ℓ_max·n
+    // bytes). We never materialize the full candidate-edge list, which would
+    // dwarf it. HashPrune is history-independent, so neither the per-leaf
+    // insertion order under lock contention nor the order of runs affects the
+    // final reservoir contents (build stays deterministic).
+    let reservoirs: Vec<Mutex<Reservoir>> = (0..n)
+        .map(|_| Mutex::new(Reservoir::new(p.l_max)))
+        .collect();
 
-    leaves.par_iter().for_each(|leaf| {
-        let s = leaf.len();
-        if s <= 1 {
-            return;
+    // Alg 4 line 2 + lines 3–5, repeated over `runs` independent partitions
+    // ("runs" knob). Each pass carves a fresh random partition (distinct seed)
+    // and streams its per-leaf candidate edges into the shared reservoirs; the
+    // union across passes recovers true neighbors that any single partition
+    // splits across a leaf boundary. recall rises with `runs` at ~linear cost.
+    let runs = p.runs.max(1);
+    for run in 0..runs {
+        // Distinct seed per pass (golden-ratio mix) → independent partitions;
+        // run 0 reproduces the single-pass build exactly when runs == 1.
+        let pr = BuildParams {
+            seed: p
+                .seed
+                .wrapping_add((run as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)),
+            ..*p
+        };
+        let leaves = partition(data, &pr);
+        if prof {
+            let tot: usize = leaves.iter().map(|l| l.len()).sum();
+            eprintln!(
+                "[pipnn] run {}/{} leaves={} repl={:.2}x",
+                run + 1,
+                runs,
+                leaves.len(),
+                tot as f64 / n as f64
+            );
         }
-        let d2 = leaf_sq_dists(data, leaf);
-        let cap = cand_cap.min(s - 1);
-        // Reusable scratch of (dist, id) pairs for one row's candidates.
-        let mut scratch: Vec<(f32, Id)> = Vec::with_capacity(s);
-        for a in 0..s {
-            let pa = leaf[a] as usize;
-            let row = &d2[a * s..(a + 1) * s];
-            // Gather this row's candidates (excluding self).
-            scratch.clear();
-            for b in 0..s {
-                if b != a {
-                    scratch.push((row[b], leaf[b]));
+
+        leaves.par_iter().for_each(|leaf| {
+            let s = leaf.len();
+            if s <= 1 {
+                return;
+            }
+            let d2 = leaf_sq_dists(data, leaf);
+            let cap = cand_cap.min(s - 1);
+            // Reusable scratch of (dist, id) pairs for one row's candidates.
+            let mut scratch: Vec<(f32, Id)> = Vec::with_capacity(s);
+            for a in 0..s {
+                let pa = leaf[a] as usize;
+                let row = &d2[a * s..(a + 1) * s];
+                // Gather this row's candidates (excluding self).
+                scratch.clear();
+                for b in 0..s {
+                    if b != a {
+                        scratch.push((row[b], leaf[b]));
+                    }
+                }
+                // Select the `cap` nearest in O(len) via quickselect, then sort
+                // just those (paper §4.2 keeps each point's nearest in-leaf
+                // candidates). This replaces an O(s²·cap) insertion sort — the
+                // leaf-build hot spot.
+                if scratch.len() > cap {
+                    scratch.select_nth_unstable_by(cap, |x, y| x.0.partial_cmp(&y.0).unwrap());
+                    scratch.truncate(cap);
+                }
+                scratch.sort_by(|x, y| x.0.partial_cmp(&y.0).unwrap());
+
+                let sa = &sketch[pa * m..(pa + 1) * m];
+                let mut res = reservoirs[pa].lock().unwrap();
+                for &(dist, dst) in &scratch {
+                    let sc = &sketch[dst as usize * m..(dst as usize + 1) * m];
+                    let code = hp.code_from_sketch(sa, sc);
+                    res.insert(dst, code, dist);
                 }
             }
-            // Select the `cap` nearest in O(len) via quickselect, then sort just
-            // those (paper §4.2 keeps each point's nearest in-leaf candidates).
-            // This replaces an O(s²·cap) insertion sort — the leaf-build hot spot.
-            if scratch.len() > cap {
-                scratch.select_nth_unstable_by(cap, |x, y| {
-                    x.0.partial_cmp(&y.0).unwrap()
-                });
-                scratch.truncate(cap);
-            }
-            scratch.sort_by(|x, y| x.0.partial_cmp(&y.0).unwrap());
-
-            let sa = &sketch[pa * m..(pa + 1) * m];
-            let mut res = reservoirs[pa].lock().unwrap();
-            for &(dist, dst) in &scratch {
-                let sc = &sketch[dst as usize * m..(dst as usize + 1) * m];
-                let code = hp.code_from_sketch(sa, sc);
-                res.insert(dst, code, dist);
-            }
-        }
-    });
+        });
+    }
     lap!("leaf+hashprune", t);
 
     // Alg 4 line 8 ("PruneNode"): RobustPrune each reservoir to ≤ R out-edges.
@@ -158,8 +182,10 @@ fn symmetrize(data: &Dataset, out_adj: &[Vec<Id>], r: usize) -> Vec<Vec<Id>> {
             v.dedup();
             v.retain(|&y| y as usize != x);
             if v.len() > r {
-                let mut withd: Vec<(f32, Id)> =
-                    v.iter().map(|&y| (data.sq_dist(x, y as usize), y)).collect();
+                let mut withd: Vec<(f32, Id)> = v
+                    .iter()
+                    .map(|&y| (data.sq_dist(x, y as usize), y))
+                    .collect();
                 withd.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap().then(a.1.cmp(&b.1)));
                 withd.truncate(r);
                 withd.into_iter().map(|(_, y)| y).collect()

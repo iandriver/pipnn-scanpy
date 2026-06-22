@@ -18,6 +18,8 @@ PiPNN.pdf
 # Data
 *.h5ad
 *.npy
+# ANN-benchmark dataset cache (SIFT/GIST hdf5, ~0.5–3.6 GB each)
+bench/data/
 
 # Docker bench outputs
 docker/out/

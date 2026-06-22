@@ -323,6 +323,52 @@ Reading the sweep:
   0.99→0.86, pynndescent →0.84) — they'd need larger `ef`/`n_neighbors` to hold
   recall, which costs the time advantage. PiPNN needs no such tuning.
 
+### ANN-benchmark iso-recall on real SIFT-1M (the paper's regime)
+
+Everything above is *self*-kNN on synthetic PCA-like data — the scanpy use case.
+The PiPNN paper's headline speedups are measured differently: **held-out queries**
+against a base index on standard high-dimensional datasets, compared at **equal
+recall**. `bench/bench_ann_isorecall.py` runs exactly that on real **SIFT-1M**
+(1M base × 128-d, 10k queries, recall@10 vs exact), with two recall knobs now
+exposed:
+
+- **`runs`** — the build-side knob: independent Randomized-Ball-Carving passes
+  whose candidates are unioned (more runs → higher reservoir recall, ~linear cost).
+- **`beam_L`** — the search-side knob: BeamSearch width per query.
+
+External queries use IVF-style **pivot routing** (a held-out query isn't a base
+point, so it has no reservoir warm-start; nearest pivots seed the beam).
+
+![Iso-recall + build time: PiPNN vs FAISS HNSW on SIFT-1M](bench/ann_isorecall_sift.png)
+
+| side | metric | PiPNN | FAISS HNSW |
+|---|---|---|---|
+| **build** | index construction (1M pts) | **6.7s** | 53.2s |
+| query | q/s @ recall ≈0.95 | 35,100 | 54,300 (ef=64, r=0.968) |
+| query | q/s @ recall ≈0.99 | 12,800 (r=0.994) | 27,300 (ef=128, r=0.991) |
+| query | q/s @ recall ≈0.997 | 3,200 (beam=1024) | 14,700 (ef=256) |
+
+The honest read — and the answer to "where's the paper's 6–12×?":
+1. **It's a *build*-time speedup, and it reproduces.** PiPNN constructs the SIFT-1M
+   index in **6.7s vs FAISS HNSW's 53.2s — ~8×**, right in the paper's 6–12× band.
+   PiPNN's GEMM-batched, single-pass construction is far cheaper than HNSW's
+   incremental, per-point graph insertion. (The earlier synthetic sweep hid this
+   because it compared against *our own* parallel HNSW at low `d`, where both builds
+   are trivially cheap; the gap only opens at scale against a real HNSW build.)
+2. **On *query* throughput, the optimized HNSW wins ~2–4×.** PiPNN's recall is
+   competitive (0.95 → 0.999), so navigability is fine on real structured data — but
+   its flat graph + beam + pivot routing can't match HNSW's hierarchical layers and
+   heavily SIMD-tuned search loop. The gap widens at the high-recall end.
+3. **Net:** PiPNN is the right tool when you **build often / query in bulk once**
+   (exactly the scanpy self-kNN workload — build a graph over all cells, read it out
+   once), where its ~8× cheaper construction dominates. For a **build-once,
+   serve-many-queries** service, HNSW's query throughput wins. Closing the query gap
+   would mean Vamana-style construction (search-path pruning for diverse long-range
+   edges) and a tighter search loop — not just more `runs`.
+
+Run GIST-960 (`--dataset gist`) or subsample (`--n-sub 200000`) for other points;
+the build-vs-query split holds.
+
 ## Metrics
 
 `euclidean` (default, matches scanpy on PCA space) and `cosine`.

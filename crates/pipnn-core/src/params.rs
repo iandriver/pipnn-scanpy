@@ -20,6 +20,13 @@ pub struct BuildParams {
     pub c_min: usize,
     /// Maximum leaf size; nodes above this keep recursing.
     pub c_max: usize,
+    /// Number of independent Randomized-Ball-Carving passes whose per-leaf
+    /// candidates are unioned into each point's reservoir (paper's "runs" knob;
+    /// 1 = single pass). More runs → higher recall at a near-linear time cost,
+    /// since each pass is an independent random partition that finds different
+    /// true neighbors near leaf boundaries. HashPrune is history-independent, so
+    /// merging passes is order-free and the build stays deterministic.
+    pub runs: usize,
     /// RNG seed (determinism / history-independence checks).
     pub seed: u64,
 }
@@ -35,6 +42,7 @@ impl Default for BuildParams {
             fanout: 2,
             c_min: 256,
             c_max: 2048,
+            runs: 1,
             seed: 0,
         }
     }

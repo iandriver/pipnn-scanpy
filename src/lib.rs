@@ -10,8 +10,9 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 use pipnn_core::{
-    build_index_with_cands, knn_self_bruteforce, knn_self_graph, knn_self_hnsw, knn_self_reservoir,
-    BuildParams, Dataset, HnswParams, Metric, Quant, SearchParams,
+    build_index, build_index_with_cands, knn_query, knn_self_bruteforce, knn_self_graph,
+    knn_self_hnsw, knn_self_reservoir, BuildParams, Dataset, HnswParams, Metric, Quant,
+    SearchParams,
 };
 
 /// Build the index and return self-kNN as flat arrays.
@@ -26,7 +27,7 @@ use pipnn_core::{
 #[pyo3(signature = (
     x, n_neighbors, metric="euclidean",
     m=12, l_max=96, r=64, alpha=1.2, beam_l=64,
-    fanout=2, c_min=256, c_max=2048, n_jobs=0, seed=0,
+    fanout=2, c_min=256, c_max=2048, runs=1, n_jobs=0, seed=0,
 ))]
 fn build_and_self_knn<'py>(
     py: Python<'py>,
@@ -41,6 +42,7 @@ fn build_and_self_knn<'py>(
     fanout: usize,
     c_min: usize,
     c_max: usize,
+    runs: usize,
     n_jobs: usize,
     seed: u64,
 ) -> PyResult<(Bound<'py, PyArray1<u32>>, Bound<'py, PyArray1<f32>>, usize)> {
@@ -65,6 +67,7 @@ fn build_and_self_knn<'py>(
         fanout,
         c_min,
         c_max,
+        runs,
         seed,
     };
     let sp = SearchParams { beam_l };
@@ -153,7 +156,11 @@ fn hnsw_self_knn<'py>(
     let quant = match quantize.to_ascii_lowercase().as_str() {
         "none" | "fp32" | "" => Quant::None,
         "sq8" => Quant::Sq8,
-        other => return Err(PyValueError::new_err(format!("unsupported quantize: {other}"))),
+        other => {
+            return Err(PyValueError::new_err(format!(
+                "unsupported quantize: {other}"
+            )))
+        }
     };
     let arr = x.as_array();
     let (n, d) = (arr.shape()[0], arr.shape()[1]);
@@ -161,10 +168,19 @@ fn hnsw_self_knn<'py>(
         return Err(PyValueError::new_err("empty input matrix"));
     }
     let flat: Vec<f32> = arr.iter().copied().collect();
-    let hp = HnswParams { m, ef_construction, ef_search, quant, seed };
+    let hp = HnswParams {
+        m,
+        ef_construction,
+        ef_search,
+        quant,
+        seed,
+    };
 
     let pool = if n_jobs > 0 {
-        rayon::ThreadPoolBuilder::new().num_threads(n_jobs).build().ok()
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(n_jobs)
+            .build()
+            .ok()
     } else {
         None
     };
@@ -185,10 +201,232 @@ fn hnsw_self_knn<'py>(
     ))
 }
 
+/// Build a PiPNN index over `x` (the base set) and return k-NN for an external
+/// `queries` set — the ANN-benchmark path (held-out queries vs. self-kNN).
+///
+/// Returns `(indices, distances, stride)` with `indices`/`distances` length
+/// `n_q * stride`, `stride == n_neighbors` (no self edge). `beam_l` is the
+/// search-side recall/speed knob; `runs` is the build-side one.
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (
+    x, queries, n_neighbors, metric="euclidean",
+    m=12, l_max=96, r=64, alpha=1.2, beam_l=64,
+    fanout=2, c_min=256, c_max=2048, runs=1, n_jobs=0, seed=0,
+))]
+fn build_and_query<'py>(
+    py: Python<'py>,
+    x: PyReadonlyArray2<'py, f32>,
+    queries: PyReadonlyArray2<'py, f32>,
+    n_neighbors: usize,
+    metric: &str,
+    m: usize,
+    l_max: usize,
+    r: usize,
+    alpha: f32,
+    beam_l: usize,
+    fanout: usize,
+    c_min: usize,
+    c_max: usize,
+    runs: usize,
+    n_jobs: usize,
+    seed: u64,
+) -> PyResult<(Bound<'py, PyArray1<u32>>, Bound<'py, PyArray1<f32>>, usize)> {
+    let metric = Metric::parse(metric)
+        .ok_or_else(|| PyValueError::new_err(format!("unsupported metric: {metric}")))?;
+
+    let arr = x.as_array();
+    let (n, d) = (arr.shape()[0], arr.shape()[1]);
+    let qarr = queries.as_array();
+    let (n_q, dq) = (qarr.shape()[0], qarr.shape()[1]);
+    if n == 0 || n_q == 0 {
+        return Err(PyValueError::new_err("empty base or query matrix"));
+    }
+    if d != dq {
+        return Err(PyValueError::new_err(format!(
+            "query dim {dq} != base dim {d}"
+        )));
+    }
+    let flat: Vec<f32> = arr.iter().copied().collect();
+    let qflat: Vec<f32> = qarr.iter().copied().collect();
+
+    let bp = BuildParams {
+        metric,
+        m,
+        l_max,
+        r,
+        alpha,
+        fanout,
+        c_min,
+        c_max,
+        runs,
+        seed,
+    };
+    let sp = SearchParams { beam_l };
+
+    let pool = if n_jobs > 0 {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(n_jobs)
+            .build()
+            .ok()
+    } else {
+        None
+    };
+
+    let knn = py.detach(|| {
+        let data = Dataset::new(&flat, n, d, metric);
+        let run = || {
+            let prof = std::env::var("PIPNN_PROFILE").is_ok();
+            let t = std::time::Instant::now();
+            let graph = build_index(&data, &bp);
+            let tb = t.elapsed().as_secs_f64();
+            let t2 = std::time::Instant::now();
+            let r = knn_query(&data, &graph, &qflat, n_q, n_neighbors, &sp);
+            if prof {
+                eprintln!(
+                    "[pipnn] BUILD={:.3}s QUERY={:.3}s [{} queries, runs={}, beam_l={}]",
+                    tb,
+                    t2.elapsed().as_secs_f64(),
+                    n_q,
+                    runs,
+                    beam_l
+                );
+            }
+            r
+        };
+        match &pool {
+            Some(p) => p.install(run),
+            None => run(),
+        }
+    });
+
+    let stride = knn.stride;
+    Ok((
+        knn.indices.into_pyarray(py),
+        knn.distances.into_pyarray(py),
+        stride,
+    ))
+}
+
+/// A persistent PiPNN index: build once, query many. The right shape for the
+/// ANN-benchmark iso-recall harness, where build cost is amortized and only the
+/// per-query `beam_l` sweep is timed (unlike the fused one-shot `build_and_query`).
+#[pyclass]
+struct PiPNNIndex {
+    base: Vec<f32>,
+    n: usize,
+    d: usize,
+    metric: Metric,
+    graph: pipnn_core::Graph,
+}
+
+#[pymethods]
+impl PiPNNIndex {
+    #[new]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (
+        x, metric="euclidean",
+        m=12, l_max=96, r=64, alpha=1.2,
+        fanout=2, c_min=256, c_max=2048, runs=1, n_jobs=0, seed=0,
+    ))]
+    fn new(
+        py: Python<'_>,
+        x: PyReadonlyArray2<'_, f32>,
+        metric: &str,
+        m: usize,
+        l_max: usize,
+        r: usize,
+        alpha: f32,
+        fanout: usize,
+        c_min: usize,
+        c_max: usize,
+        runs: usize,
+        n_jobs: usize,
+        seed: u64,
+    ) -> PyResult<Self> {
+        let metric = Metric::parse(metric)
+            .ok_or_else(|| PyValueError::new_err(format!("unsupported metric: {metric}")))?;
+        let arr = x.as_array();
+        let (n, d) = (arr.shape()[0], arr.shape()[1]);
+        if n == 0 {
+            return Err(PyValueError::new_err("empty base matrix"));
+        }
+        let base: Vec<f32> = arr.iter().copied().collect();
+        let bp = BuildParams {
+            metric,
+            m,
+            l_max,
+            r,
+            alpha,
+            fanout,
+            c_min,
+            c_max,
+            runs,
+            seed,
+        };
+        let pool = if n_jobs > 0 {
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(n_jobs)
+                .build()
+                .ok()
+        } else {
+            None
+        };
+        let graph = py.detach(|| {
+            let data = Dataset::new(&base, n, d, metric);
+            let run = || build_index(&data, &bp);
+            match &pool {
+                Some(p) => p.install(run),
+                None => run(),
+            }
+        });
+        Ok(PiPNNIndex {
+            base,
+            n,
+            d,
+            metric,
+            graph,
+        })
+    }
+
+    /// Query an external set. Returns `(indices, distances, stride)` flat arrays
+    /// (`stride == n_neighbors`, no self edge). `beam_l` is the recall/speed knob.
+    #[pyo3(signature = (queries, n_neighbors, beam_l=64))]
+    fn query<'py>(
+        &self,
+        py: Python<'py>,
+        queries: PyReadonlyArray2<'py, f32>,
+        n_neighbors: usize,
+        beam_l: usize,
+    ) -> PyResult<(Bound<'py, PyArray1<u32>>, Bound<'py, PyArray1<f32>>, usize)> {
+        let qarr = queries.as_array();
+        let (n_q, dq) = (qarr.shape()[0], qarr.shape()[1]);
+        if dq != self.d {
+            return Err(PyValueError::new_err(format!(
+                "query dim {dq} != base dim {}",
+                self.d
+            )));
+        }
+        let qflat: Vec<f32> = qarr.iter().copied().collect();
+        let sp = SearchParams { beam_l };
+        let knn = py.detach(|| {
+            let data = Dataset::new(&self.base, self.n, self.d, self.metric);
+            knn_query(&data, &self.graph, &qflat, n_q, n_neighbors, &sp)
+        });
+        Ok((
+            knn.indices.into_pyarray(py),
+            knn.distances.into_pyarray(py),
+            knn.stride,
+        ))
+    }
+}
+
 #[pymodule]
 fn _pipnn(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(build_and_self_knn, m)?)?;
+    m.add_function(wrap_pyfunction!(build_and_query, m)?)?;
     m.add_function(wrap_pyfunction!(hnsw_self_knn, m)?)?;
+    m.add_class::<PiPNNIndex>()?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }

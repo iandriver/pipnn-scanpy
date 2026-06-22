@@ -65,6 +65,7 @@ class PiPNNTransformer(TransformerMixin, BaseEstimator):
         fanout: int = 2,
         c_min: int = 256,
         c_max: int = 2048,
+        runs: int = 1,
         n_jobs: int = -1,
         random_state: int = 0,
     ):
@@ -79,6 +80,7 @@ class PiPNNTransformer(TransformerMixin, BaseEstimator):
         self.fanout = fanout
         self.c_min = c_min
         self.c_max = c_max
+        self.runs = runs
         self.n_jobs = n_jobs
         self.random_state = random_state
 
@@ -105,6 +107,7 @@ class PiPNNTransformer(TransformerMixin, BaseEstimator):
             int(self.fanout),
             int(self.c_min),
             int(self.c_max),
+            int(self.runs),
             int(n_jobs),
             int(self.random_state),
         )
