@@ -25,6 +25,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # First, so an AMD (no-AVX-512) draw can be spotted/cancelled before the
+      # slow build — the glassppy wheel SIGILLs without AVX-512.
+      - name: Runner CPU SIMD flags (pyglass needs AVX-512)
+        run: |
+          echo "avx2: $(grep -c avx2 /proc/cpuinfo || true)  avx512f: $(grep -c avx512f /proc/cpuinfo || true)"
+          grep -m1 -o 'model name.*' /proc/cpuinfo || true
+
       - uses: dtolnay/rust-toolchain@stable
 
       # glassppy ships only as a CPython 3.10 manylinux x86_64 wheel.
@@ -51,11 +58,6 @@ jobs:
           pip install glassppy || echo "::warning::glassppy install failed; pyglass arm will be skipped"
           python -c "import glassppy; print('glassppy', getattr(glassppy,'__version__','?'))" \
             || echo "::warning::glassppy not importable; pyglass arm will be skipped"
-
-      - name: Runner CPU SIMD flags (pyglass needs these)
-        run: |
-          echo "avx2: $(grep -c avx2 /proc/cpuinfo || true)  avx512f: $(grep -c avx512f /proc/cpuinfo || true)"
-          grep -m1 -o 'model name.*' /proc/cpuinfo || true
 
       - name: Run iso-recall harness
         run: |
