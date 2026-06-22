@@ -1,0 +1,66 @@
+name: ANN iso-recall (x86, with pyglass)
+
+# Manual-only: builds the PiPNN extension on x86_64 Linux, installs pyglass
+# (glassppy — manylinux x86_64 / CPython 3.10 only, can't run on the arm64 dev
+# machine) alongside FAISS, and runs bench/bench_ann_isorecall.py to produce a
+# real PiPNN vs pyglass vs FAISS recall-QPS + build-time figure. Artifacts: the
+# png + json. Trigger: Actions tab → this workflow → Run, or `gh workflow run`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dataset:
+        description: "ANN-benchmark dataset"
+        type: choice
+        options: [sift, gist]
+        default: sift
+      n_sub:
+        description: "Subsample base to this many points (0 = full 1M)"
+        type: string
+        default: "200000"
+
+jobs:
+  isorecall:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # glassppy ships only as a CPython 3.10 manylinux x86_64 wheel.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      # Cache the (large) ann-benchmarks hdf5 + recomputed ground truth.
+      - name: Cache dataset
+        uses: actions/cache@v4
+        with:
+          path: bench/data
+          key: ann-data-${{ inputs.dataset }}
+
+      - name: Build extension + install backends
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --upgrade pip maturin
+          pip install numpy scipy scikit-learn matplotlib h5py faiss-cpu
+          maturin develop --release
+          # pyglass: non-fatal — if the wheel can't install, the harness skips it
+          # and still emits a PiPNN vs FAISS curve.
+          pip install glassppy || echo "::warning::glassppy install failed; pyglass arm will be skipped"
+          python -c "import glassppy; print('glassppy', getattr(glassppy,'__version__','?'))" \
+            || echo "::warning::glassppy not importable; pyglass arm will be skipped"
+
+      - name: Run iso-recall harness
+        run: |
+          . .venv/bin/activate
+          python bench/bench_ann_isorecall.py --dataset "${{ inputs.dataset }}" --n-sub "${{ inputs.n_sub }}"
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: ann-isorecall-${{ inputs.dataset }}
+          path: |
+            bench/ann_isorecall_${{ inputs.dataset }}.png
+            bench/ann_isorecall_${{ inputs.dataset }}.json

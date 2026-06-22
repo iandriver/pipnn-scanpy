@@ -137,6 +137,44 @@ def run_faiss_hnsw(base, query, gt, efs):
     return out
 
 
+def run_glass_hnsw(base, query, gt, efs):
+    """pyglass (zilliztech/pyglass) HNSW — x86_64 only; skipped where `glass`
+    isn't importable (e.g. macOS/arm64). One of the fastest HNSW query engines,
+    so it's the toughest query-side baseline."""
+    for name in ("glassppy", "glass"):
+        try:
+            glass = __import__(name)
+            break
+        except Exception:
+            glass = None
+    if glass is None:
+        print("  [pyglass not importable — skipped (x86_64 manylinux wheel only)]")
+        return None
+
+    import os
+    glass.set_num_threads(os.cpu_count() or 1)
+    index = glass.Index(index_type="HNSW", metric="L2", quant="FP32", R=32, L=200)
+    tb = time.perf_counter()
+    graph = index.build(base)
+    build_s = time.perf_counter() - tb
+    print(f"  [pyglass HNSW build {build_s:.2f}s]")
+    searcher = glass.Searcher(graph=graph, data=base, metric="L2", quantizer="FP32")
+    out = []
+    for ef in efs:
+        searcher.set_ef(max(int(ef), K + 1))
+        searcher.optimize()  # tunes prefetch for this ef (setup, not timed)
+
+        def fn():
+            ids, _ = searcher.batch_search(query, K)
+            return np.asarray(ids, dtype=np.int64).reshape(len(query), -1)[:, :K]
+        t = time_query(fn)
+        out.append({"label": f"ef={ef}", "recall": recall(fn(), gt),
+                    "qps": len(query) / t, "build_s": build_s})
+        print(f"  pyglass HNSW ef={ef:5d} | recall={out[-1]['recall']:.4f} "
+              f"| {out[-1]['qps']:8.0f} q/s")
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dataset", choices=list(URLS), default="sift")
@@ -156,6 +194,10 @@ def main():
     )
     print("\nFAISS HNSW (reference graph-ANN; efSearch swept):")
     results["faiss_hnsw"] = run_faiss_hnsw(base, query, gt, efs=[16, 32, 64, 128, 256])
+    print("\npyglass HNSW (x86_64 only):")
+    glass_res = run_glass_hnsw(base, query, gt, efs=[16, 32, 64, 128, 256])
+    if glass_res:
+        results["glass_hnsw"] = glass_res
 
     with open(HERE / f"ann_isorecall_{args.dataset}.json", "w") as f:
         json.dump(results, f, indent=2)
@@ -170,9 +212,14 @@ def _plot(results, dataset):
 
     fig, ax = plt.subplots(1, 2, figsize=(13, 4.8),
                            gridspec_kw={"width_ratios": [2, 1]})
+    # Series present in this run (pyglass only on x86_64).
+    series = [("PiPNN", "pipnn", "o-", "#2a9d8f"),
+              ("FAISS HNSW", "faiss_hnsw", "s-", "#3a7ca5")]
+    if "glass_hnsw" in results:
+        series.append(("pyglass HNSW", "glass_hnsw", "^-", "#e76f51"))
+
     # Left: recall-vs-QPS Pareto (query side — higher/right is better).
-    for name, key, mk, col in [("PiPNN", "pipnn", "o-", "#2a9d8f"),
-                               ("FAISS HNSW", "faiss_hnsw", "s-", "#3a7ca5")]:
+    for name, key, mk, col in series:
         pts = sorted(results[key], key=lambda p: p["recall"])
         ax[0].plot([p["recall"] for p in pts], [p["qps"] for p in pts], mk,
                    color=col, label=name)
@@ -184,15 +231,17 @@ def _plot(results, dataset):
     ax[0].legend()
 
     # Right: index build time (the side where PiPNN's GEMM construction wins).
-    builds = {
-        "PiPNN\n(runs=1)": next(p["build_s"] for p in results["pipnn"]
-                                if "runs=1" in p["label"]),
-        "PiPNN\n(runs=3)": next(p["build_s"] for p in results["pipnn"]
-                                if "runs=3" in p["label"]),
-        "FAISS\nHNSW": results["faiss_hnsw"][0]["build_s"],
-    }
-    cols = ["#2a9d8f", "#1d7268", "#3a7ca5"]
-    bars = ax[1].bar(list(builds), list(builds.values()), color=cols)
+    builds = [
+        ("PiPNN\n(runs=1)", next(p["build_s"] for p in results["pipnn"]
+                                 if "runs=1" in p["label"]), "#2a9d8f"),
+        ("PiPNN\n(runs=3)", next(p["build_s"] for p in results["pipnn"]
+                                 if "runs=3" in p["label"]), "#1d7268"),
+        ("FAISS\nHNSW", results["faiss_hnsw"][0]["build_s"], "#3a7ca5"),
+    ]
+    if "glass_hnsw" in results:
+        builds.append(("pyglass\nHNSW", results["glass_hnsw"][0]["build_s"], "#e76f51"))
+    bars = ax[1].bar([b[0] for b in builds], [b[1] for b in builds],
+                     color=[b[2] for b in builds])
     ax[1].bar_label(bars, fmt="%.1fs", padding=3)
     ax[1].set_ylabel("index build time (s) — lower is better")
     ax[1].set_title("Build time (whole base)")
