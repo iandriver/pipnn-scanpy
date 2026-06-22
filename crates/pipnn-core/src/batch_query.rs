@@ -158,3 +158,90 @@ pub fn knn_self_reservoir(
         stride,
     }
 }
+
+/// k-NN for an *external* query set against a built index (the ANN-benchmark
+/// path: held-out queries, not self-kNN).
+///
+/// `queries` is a flat `n_q × d` row-major matrix (same `d` as `data`). A
+/// held-out query is not a base point, so it has no reservoir warm-start and a
+/// single far entry medoid navigates the (locally-built) graph poorly. Instead
+/// we route each query coarsely — IVF-style — to a small set of **pivots** (a
+/// deterministic stride sample of base points): the query's nearest pivots seed
+/// the beam near its neighborhood, then [`beam_search`] refines. `n_pivots`
+/// trades routing cost for entry quality; `beam_l` trades search time for
+/// recall (the two recall knobs alongside the build-side `runs`).
+///
+/// Returns `n_q × k` ids + emitted distances (`stride == k`, no self edge).
+pub fn knn_query(
+    data: &Dataset,
+    graph: &Graph,
+    queries: &[f32],
+    n_q: usize,
+    k: usize,
+    s: &SearchParams,
+) -> SelfKnn {
+    let d = data.d;
+    let n = data.n;
+    let stride = k.min(n.max(1));
+    let beam_l = s.beam_l.max(stride);
+
+    // Coarse-routing pivots: an evenly-strided (deterministic) sample of base
+    // ids whose nearest `n_seed` to a query seed its beam. The routing scan is
+    // `n_pivots·d` per query, so we keep the set small — enough to land the beam
+    // in the right region (beam_search refines from there), not to be accurate
+    // itself. ~4·√n, capped at 2048, floored at beam_l.
+    let n_pivots = ((4.0 * (n as f64).sqrt()) as usize)
+        .max(beam_l)
+        .min(2048)
+        .min(n);
+    let stridep = (n / n_pivots).max(1);
+    let pivots: Vec<Id> = (0..n).step_by(stridep).map(|i| i as Id).collect();
+    let n_seed = 16usize.min(pivots.len());
+
+    let mut indices = vec![0 as Id; n_q * stride];
+    let mut distances = vec![0.0f32; n_q * stride];
+
+    indices
+        .par_chunks_mut(stride)
+        .zip(distances.par_chunks_mut(stride))
+        .enumerate()
+        .map_init(
+            || {
+                (
+                    Scratch::new(n),
+                    Vec::<(f32, Id)>::with_capacity(pivots.len()),
+                )
+            },
+            |(scratch, pv), (i, (idx_row, dist_row))| {
+                let q = &queries[i * d..(i + 1) * d];
+                // Nearest `n_seed` pivots → beam seeds (the coarse router).
+                pv.clear();
+                for &p in &pivots {
+                    pv.push((data.sq_dist_to(p as usize, q), p));
+                }
+                if pv.len() > n_seed {
+                    pv.select_nth_unstable_by(n_seed, |a, b| a.0.partial_cmp(&b.0).unwrap());
+                    pv.truncate(n_seed);
+                }
+                let seeds: Vec<Id> = pv.iter().map(|&(_, id)| id).collect();
+                let mut res = beam_search(data, graph, &seeds, q, beam_l, scratch);
+                res.truncate(stride);
+                // Pad short results (tiny graphs) by repeating the last id.
+                while res.len() < stride {
+                    let pad = res.last().copied().unwrap_or((graph.entry, 0.0));
+                    res.push(pad);
+                }
+                for (slot, &(id, d2)) in res.iter().enumerate() {
+                    idx_row[slot] = id;
+                    dist_row[slot] = data.metric.emit(d2);
+                }
+            },
+        )
+        .for_each(|_| {});
+
+    SelfKnn {
+        indices,
+        distances,
+        stride,
+    }
+}
