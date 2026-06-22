@@ -175,6 +175,43 @@ def run_glass_hnsw(base, query, gt, efs):
     return out
 
 
+def run_glass_isolated(base, query, gt, efs):
+    """Run the pyglass arm in a child process so its precompiled-SIMD SIGILL
+    (its manylinux wheel may use AVX-512 the runner CPU lacks) can't take down
+    the whole harness. Returns the result list, or None if glass is absent or
+    the child crashed/errored."""
+    import multiprocessing as mp
+
+    ctx = mp.get_context("fork")
+    q = ctx.Queue()
+
+    def worker(qq):
+        try:
+            qq.put(run_glass_hnsw(base, query, gt, efs))
+        except Exception as e:  # pragma: no cover - exercised only on x86 CI
+            qq.put({"__error__": repr(e)})
+
+    p = ctx.Process(target=worker, args=(q,))
+    p.start()
+    p.join()
+    if p.exitcode != 0:  # SIGILL etc. → negative exitcode / 132
+        print(f"  [pyglass child crashed (exit {p.exitcode}) — likely a CPU/SIMD "
+              f"mismatch in the wheel; skipped]")
+        return None
+    res = q.get() if not q.empty() else None
+    if isinstance(res, dict) and "__error__" in res:
+        print(f"  [pyglass error: {res['__error__']}] — skipped")
+        return None
+    return res
+
+
+def _write(results, dataset):
+    with open(HERE / f"ann_isorecall_{dataset}.json", "w") as f:
+        json.dump(results, f, indent=2)
+    _plot(results, dataset)
+    print(f"wrote bench/ann_isorecall_{dataset}.{{json,png}}", flush=True)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dataset", choices=list(URLS), default="sift")
@@ -184,25 +221,26 @@ def main():
 
     base, query, gt = load(args.dataset, args.n_sub or None)
     n, d = base.shape
-    print(f"\n{args.dataset}: base={n}x{d}  queries={len(query)}  recall@{K}\n")
+    print(f"\n{args.dataset}: base={n}x{d}  queries={len(query)}  recall@{K}\n",
+          flush=True)
 
     results = {"dataset": args.dataset, "n": n, "d": d, "nq": len(query)}
-    print("PiPNN (persistent index; runs = build passes, beam_L = search width):")
+    print("PiPNN (persistent index; runs = build passes, beam_L = search width):",
+          flush=True)
     results["pipnn"] = (
         run_pipnn(base, query, gt, runs=1, beams=[64, 256, 1024])
         + run_pipnn(base, query, gt, runs=3, beams=[256, 1024, 4096])
     )
-    print("\nFAISS HNSW (reference graph-ANN; efSearch swept):")
+    print("\nFAISS HNSW (reference graph-ANN; efSearch swept):", flush=True)
     results["faiss_hnsw"] = run_faiss_hnsw(base, query, gt, efs=[16, 32, 64, 128, 256])
-    print("\npyglass HNSW (x86_64 only):")
-    glass_res = run_glass_hnsw(base, query, gt, efs=[16, 32, 64, 128, 256])
+    # Write now so the PiPNN-vs-FAISS artifact survives even if pyglass crashes.
+    _write(results, args.dataset)
+
+    print("\npyglass HNSW (x86_64 only; isolated subprocess):", flush=True)
+    glass_res = run_glass_isolated(base, query, gt, efs=[16, 32, 64, 128, 256])
     if glass_res:
         results["glass_hnsw"] = glass_res
-
-    with open(HERE / f"ann_isorecall_{args.dataset}.json", "w") as f:
-        json.dump(results, f, indent=2)
-    _plot(results, args.dataset)
-    print(f"\nwrote bench/ann_isorecall_{args.dataset}.{{json,png}}")
+        _write(results, args.dataset)  # re-write with the third arm
 
 
 def _plot(results, dataset):

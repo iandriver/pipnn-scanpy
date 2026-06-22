@@ -52,15 +52,24 @@ jobs:
           python -c "import glassppy; print('glassppy', getattr(glassppy,'__version__','?'))" \
             || echo "::warning::glassppy not importable; pyglass arm will be skipped"
 
+      - name: Runner CPU SIMD flags (pyglass needs these)
+        run: |
+          echo "avx2: $(grep -c avx2 /proc/cpuinfo || true)  avx512f: $(grep -c avx512f /proc/cpuinfo || true)"
+          grep -m1 -o 'model name.*' /proc/cpuinfo || true
+
       - name: Run iso-recall harness
         run: |
           . .venv/bin/activate
-          python bench/bench_ann_isorecall.py --dataset "${{ inputs.dataset }}" --n-sub "${{ inputs.n_sub }}"
+          # -u: unbuffered, so PiPNN/FAISS results reach the log even if the
+          # isolated pyglass child SIGILLs on an unsupported instruction set.
+          python -u bench/bench_ann_isorecall.py --dataset "${{ inputs.dataset }}" --n-sub "${{ inputs.n_sub }}"
 
       - name: Upload results
+        if: always()  # PiPNN-vs-FAISS artifact is written before the pyglass arm
         uses: actions/upload-artifact@v4
         with:
           name: ann-isorecall-${{ inputs.dataset }}
+          if-no-files-found: warn
           path: |
             bench/ann_isorecall_${{ inputs.dataset }}.png
             bench/ann_isorecall_${{ inputs.dataset }}.json
