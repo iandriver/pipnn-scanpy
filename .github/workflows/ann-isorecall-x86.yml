@@ -18,6 +18,10 @@ on:
         description: "Subsample base to this many points (0 = full 1M)"
         type: string
         default: "200000"
+      require_avx512:
+        description: "Bail immediately if the runner lacks AVX-512 (to retry for an Intel runner where pyglass can run)"
+        type: boolean
+        default: false
 
 jobs:
   isorecall:
@@ -31,6 +35,10 @@ jobs:
         run: |
           echo "avx2: $(grep -c avx2 /proc/cpuinfo || true)  avx512f: $(grep -c avx512f /proc/cpuinfo || true)"
           grep -m1 -o 'model name.*' /proc/cpuinfo || true
+          if [ "${{ inputs.require_avx512 }}" = "true" ] && [ "$(grep -c avx512f /proc/cpuinfo)" = "0" ]; then
+            echo "::error::runner lacks AVX-512 — bailing (re-dispatch to gamble for an Intel runner)"
+            exit 1
+          fi
 
       - uses: dtolnay/rust-toolchain@stable
 
