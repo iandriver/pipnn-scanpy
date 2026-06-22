@@ -137,18 +137,19 @@ def run_faiss_hnsw(base, query, gt, efs):
     return out
 
 
-def run_glass_hnsw(base, query, gt, efs):
+def run_glass_hnsw(base, query, gt, efs, sink=None):
     """pyglass (zilliztech/pyglass) HNSW — x86_64 only; skipped where `glass`
     isn't importable (e.g. macOS/arm64). One of the fastest HNSW query engines,
-    so it's the toughest query-side baseline."""
-    for name in ("glassppy", "glass"):
+    so it's the toughest query-side baseline. Writes each point to `sink`
+    incrementally so a mid-sweep crash still salvages the points collected."""
+    for name in ("glass", "glassppy"):  # prefer the native source build
         try:
             glass = __import__(name)
             break
         except Exception:
             glass = None
     if glass is None:
-        print("  [pyglass not importable — skipped (x86_64 manylinux wheel only)]")
+        print("  [pyglass not importable — skipped (no arm64/manylinux build)]")
         return None
 
     import os
@@ -157,12 +158,15 @@ def run_glass_hnsw(base, query, gt, efs):
     tb = time.perf_counter()
     graph = index.build(base)
     build_s = time.perf_counter() - tb
-    print(f"  [pyglass HNSW build {build_s:.2f}s]")
+    print(f"  [pyglass HNSW build {build_s:.2f}s]", flush=True)
     searcher = glass.Searcher(graph=graph, data=base, metric="L2", quantizer="FP32")
+    # optimize() ONCE — re-optimizing per ef segfaults the searcher.
+    searcher.set_ef(max(max(efs), K + 1))
+    searcher.optimize()
+
     out = []
     for ef in efs:
         searcher.set_ef(max(int(ef), K + 1))
-        searcher.optimize()  # tunes prefetch for this ef (setup, not timed)
 
         def fn():
             ids, _ = searcher.batch_search(query, K)
@@ -171,38 +175,44 @@ def run_glass_hnsw(base, query, gt, efs):
         out.append({"label": f"ef={ef}", "recall": recall(fn(), gt),
                     "qps": len(query) / t, "build_s": build_s})
         print(f"  pyglass HNSW ef={ef:5d} | recall={out[-1]['recall']:.4f} "
-              f"| {out[-1]['qps']:8.0f} q/s")
+              f"| {out[-1]['qps']:8.0f} q/s", flush=True)
+        if sink:  # persist after each point so a crash keeps what we have
+            with open(sink, "w") as f:
+                json.dump(out, f)
     return out
 
 
 def run_glass_isolated(base, query, gt, efs):
-    """Run the pyglass arm in a child process so its precompiled-SIMD SIGILL
-    (its manylinux wheel may use AVX-512 the runner CPU lacks) can't take down
-    the whole harness. Returns the result list, or None if glass is absent or
-    the child crashed/errored."""
+    """Run the pyglass arm in a child process so its instability (SIGILL on an
+    AVX-512 wheel / SIGSEGV mid-sweep) can't take down the whole harness. The
+    child streams each point to a temp file, so even a crash keeps the points
+    collected before it. Returns the (possibly partial) result list, or None."""
     import multiprocessing as mp
+    import os
+    import tempfile
+
+    sink = os.path.join(tempfile.gettempdir(), "glass_partial.json")
+    try:
+        os.remove(sink)
+    except OSError:
+        pass
 
     ctx = mp.get_context("fork")
-    q = ctx.Queue()
-
-    def worker(qq):
-        try:
-            qq.put(run_glass_hnsw(base, query, gt, efs))
-        except Exception as e:  # pragma: no cover - exercised only on x86 CI
-            qq.put({"__error__": repr(e)})
-
-    p = ctx.Process(target=worker, args=(q,))
+    p = ctx.Process(target=run_glass_hnsw, args=(base, query, gt, efs, sink))
     p.start()
     p.join()
-    if p.exitcode != 0:  # SIGILL etc. → negative exitcode / 132
-        print(f"  [pyglass child crashed (exit {p.exitcode}) — likely a CPU/SIMD "
-              f"mismatch in the wheel; skipped]")
-        return None
-    res = q.get() if not q.empty() else None
-    if isinstance(res, dict) and "__error__" in res:
-        print(f"  [pyglass error: {res['__error__']}] — skipped")
-        return None
-    return res
+
+    res = None
+    if os.path.exists(sink):
+        try:
+            with open(sink) as f:
+                res = json.load(f)
+        except Exception:
+            res = None
+    if p.exitcode != 0:
+        print(f"  [pyglass child exited {p.exitcode} (likely SIGSEGV mid-sweep) — "
+              f"keeping {len(res or [])} point(s) collected before the crash]")
+    return res or None
 
 
 def _write(results, dataset):
