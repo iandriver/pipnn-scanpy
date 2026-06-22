@@ -25,6 +25,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Informational: pyglass is built from source for the runner's own arch
+      # (-march=native), so AVX2 is enough — no AVX-512 needed.
+      - name: Runner CPU SIMD flags
+        run: |
+          echo "avx2: $(grep -c avx2 /proc/cpuinfo || true)  avx512f: $(grep -c avx512f /proc/cpuinfo || true)"
+          grep -m1 -o 'model name.*' /proc/cpuinfo || true
+
       - uses: dtolnay/rust-toolchain@stable
 
       # glassppy ships only as a CPython 3.10 manylinux x86_64 wheel.
@@ -44,23 +51,35 @@ jobs:
           python -m venv .venv
           . .venv/bin/activate
           python -m pip install --upgrade pip maturin
-          pip install numpy scipy scikit-learn matplotlib h5py faiss-cpu
+          pip install numpy scipy scikit-learn matplotlib h5py faiss-cpu pybind11 setuptools wheel
           maturin develop --release
-          # pyglass: non-fatal — if the wheel can't install, the harness skips it
-          # and still emits a PiPNN vs FAISS curve.
-          pip install glassppy || echo "::warning::glassppy install failed; pyglass arm will be skipped"
-          python -c "import glassppy; print('glassppy', getattr(glassppy,'__version__','?'))" \
-            || echo "::warning::glassppy not importable; pyglass arm will be skipped"
+          # pyglass: build FROM SOURCE (installs as `glass`), not the PyPI wheel.
+          # The wheel is compiled for AVX-512 and SIGILLs on GitHub's AMD EPYC
+          # runners (no AVX-512); the source build uses `-march=native`, so it
+          # targets the runner's own AVX2 and runs. Non-fatal — the harness still
+          # emits a PiPNN-vs-FAISS curve if this fails.
+          git clone --depth 1 https://github.com/zilliztech/pyglass.git /tmp/pyglass || true
+          if [ -d /tmp/pyglass/python ]; then
+            # build in-place (no isolation): setup.py references ../glass, ../third_party
+            ( cd /tmp/pyglass/python && python setup.py bdist_wheel && pip install dist/*.whl ) \
+              || echo "::warning::pyglass source build failed; arm will be skipped"
+          fi
+          python -c "import glass; print('glass source build OK', getattr(glass,'__version__','?'))" \
+            || echo "::warning::pyglass ('glass') not importable; arm will be skipped"
 
       - name: Run iso-recall harness
         run: |
           . .venv/bin/activate
-          python bench/bench_ann_isorecall.py --dataset "${{ inputs.dataset }}" --n-sub "${{ inputs.n_sub }}"
+          # -u: unbuffered, so PiPNN/FAISS results reach the log even if the
+          # isolated pyglass child SIGILLs on an unsupported instruction set.
+          python -u bench/bench_ann_isorecall.py --dataset "${{ inputs.dataset }}" --n-sub "${{ inputs.n_sub }}"
 
       - name: Upload results
+        if: always()  # PiPNN-vs-FAISS artifact is written before the pyglass arm
         uses: actions/upload-artifact@v4
         with:
           name: ann-isorecall-${{ inputs.dataset }}
+          if-no-files-found: warn
           path: |
             bench/ann_isorecall_${{ inputs.dataset }}.png
             bench/ann_isorecall_${{ inputs.dataset }}.json

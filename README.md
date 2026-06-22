@@ -369,6 +369,31 @@ The honest read — and the answer to "where's the paper's 6–12×?":
 Run GIST-960 (`--dataset gist`) or subsample (`--n-sub 200000`) for other points;
 the build-vs-query split holds.
 
+#### Three-way with pyglass (x86 CI)
+
+[pyglass](https://github.com/zilliztech/pyglass) (zilliz) is a *different* library
+from FAISS — its own HNSW/NSG engine, and one of the fastest HNSW **query**
+implementations. It has no arm64 wheel and its PyPI wheel needs AVX-512 (which
+GitHub's AMD runners lack), so it runs via the manual
+[`ann-isorecall-x86`](.github/workflows/ann-isorecall-x86.yml) workflow, which
+builds pyglass **from source** (`-march=native`) and runs all three backends.
+SIFT, 200k × 128, 10k queries:
+
+![PiPNN vs FAISS vs pyglass on SIFT (x86 CI)](bench/ann_isorecall_sift_x86.png)
+
+| | build | q/s @ r≈0.98 | q/s @ r≈0.996 | q/s @ r≈0.999 |
+|---|---|---|---|---|
+| PiPNN | **11.1s** | 6,841 (r=0.985) | 2,340 | 631 |
+| FAISS HNSW | 19.7s | 25,847 | 14,427 | 7,791 |
+| pyglass HNSW | 18.5s | 37,330 | 20,813 | 11,572 |
+
+It confirms both expectations: **pyglass wins query throughput** (~1.4× over FAISS,
+the steepest Pareto front), while **PiPNN still has the fastest build** — pyglass's
+build (18.5s) sits right next to FAISS's, so PiPNN's construction lead holds against
+it too. (At this 200k/2-core-runner scale the build gap is ~1.7×; at SIFT-1M on more
+cores it was ~8× — the build advantage grows with `n`.) Net unchanged: PiPNN owns
+build-often/read-once; pyglass and FAISS own serve-many-queries, with pyglass fastest.
+
 ## Metrics
 
 `euclidean` (default, matches scanpy on PCA space) and `cosine`.
