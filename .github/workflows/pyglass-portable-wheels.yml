@@ -1,0 +1,62 @@
+name: pyglass-portable wheels
+
+# Builds portable pyglass wheels (AVX2 on x86, NEON on arm64) from
+# tools/pyglass-portable/portable.patch, across a multi-OS/arch matrix, and
+# uploads them as artifacts. Proves one wheel per arch runs on that whole arch —
+# unlike upstream's AVX-512-only `glassppy` wheel. Manual trigger.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  wheels:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-latest, label: "linux-x86_64 (AVX2)"}
+          - {os: macos-14,      label: "macos-arm64 (NEON)"}
+          - {os: macos-13,      label: "macos-x86_64 (AVX2)"}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: CPU SIMD flags (informational)
+        run: |
+          if [ "$(uname -s)" = "Linux" ]; then
+            echo "avx2: $(grep -c avx2 /proc/cpuinfo) avx512f: $(grep -c avx512f /proc/cpuinfo)"
+            grep -m1 -o 'model name.*' /proc/cpuinfo || true
+          else
+            sysctl -n machdep.cpu.brand_string 2>/dev/null || true
+            echo "arch: $(uname -m)"
+          fi
+
+      - name: Build portable wheel
+        run: |
+          python -m pip install --upgrade pip
+          PYTHON="$(which python)" bash tools/pyglass-portable/build_wheel.sh "$PWD/wheelhouse"
+
+      - name: Smoke-test the wheel (import + build + search)
+        run: |
+          python -m pip install numpy scikit-learn
+          python -m pip install --force-reinstall wheelhouse/glass-*.whl
+          python - <<'PY'
+          import numpy as np, glass, platform, time
+          b = np.ascontiguousarray(np.random.default_rng(0).normal(size=(20000, 96)).astype(np.float32))
+          i = glass.Index("HNSW", "L2", "FP32", 32, 200); g = i.build(b)
+          s = glass.Searcher(g, b, "L2", "FP32"); s.set_ef(64); s.optimize()
+          t = time.perf_counter(); ids, _ = s.batch_search(b[:500], 10); dt = time.perf_counter() - t
+          print(f"OK pyglass on {platform.machine()}: {500/dt:.0f} q/s")
+          PY
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyglass-portable-${{ matrix.os }}
+          path: wheelhouse/glass-*.whl
+          if-no-files-found: error

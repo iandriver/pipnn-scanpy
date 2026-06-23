@@ -1,0 +1,180 @@
+diff --git a/glass/memory.hpp b/glass/memory.hpp
+index 68845f7..9b23f11 100644
+--- a/glass/memory.hpp
++++ b/glass/memory.hpp
+@@ -21,9 +21,11 @@ inline void *align_alloc_memory(size_t nbytes, bool set = true, uint8_t x = 0) {
+         printf("Allocating %.2fG memory for %.2fG data\n", double(len) / size_1G, double(nbytes) / size_1G);
+     }
+     auto p = std::aligned_alloc(alignment, len);
++#ifdef MADV_HUGEPAGE  // Linux-only transparent-hugepage hint; absent on macOS/BSD
+     if constexpr (alignment >= size_2M) {
+         madvise(p, len, MADV_HUGEPAGE);
+     }
++#endif
+     if (set) {
+         std::memset(p, x, len);
+     }
+diff --git a/glass/quant/sq1_quant.hpp b/glass/quant/sq1_quant.hpp
+index 7321b97..423a02d 100644
+--- a/glass/quant/sq1_quant.hpp
++++ b/glass/quant/sq1_quant.hpp
+@@ -1,6 +1,8 @@
+ #pragma once
+ 
++#if defined(__SSE2__)
+ #include <immintrin.h>
++#endif
+ 
+ #include <bit>
+ #include <cmath>
+diff --git a/glass/searcher/refiner.hpp b/glass/searcher/refiner.hpp
+index 4a92c0f..d6df443 100644
+--- a/glass/searcher/refiner.hpp
++++ b/glass/searcher/refiner.hpp
+@@ -57,7 +57,7 @@ struct Refiner : GraphSearcherBase {
+                 computer.prefetch(ret[i + 1], 1);
+             }
+             int id = ret[i];
+-            float dist = computer(id);
++            auto dist = computer(id);  // computer's native dist_type (avoids float->int narrowing)
+             heap.push({id, dist});
+         }
+         for (int i = heap.size() - 1; i >= 0; --i) {
+@@ -97,7 +97,7 @@ struct Refiner : GraphSearcherBase {
+                 computer.prefetch(from[j + 1], 1);
+             }
+             int id = from[j];
+-            float dist = computer(id);
++            auto dist = computer(id);  // computer's native dist_type (avoids float->int narrowing)
+             heap.push({id, dist});
+         }
+         for (int j = heap.size() - 1; j >= 0; --j) {
+diff --git a/glass/simd/avx2.hpp b/glass/simd/avx2.hpp
+index e58cc89..704c931 100644
+--- a/glass/simd/avx2.hpp
++++ b/glass/simd/avx2.hpp
+@@ -1,8 +1,8 @@
+ #pragma once
+ 
+-#include "helpa/platform/x86/utils.hpp"
+ #if defined(__AVX2__)
+ 
++#include "helpa/platform/x86/utils.hpp"
+ #include <immintrin.h>
+ 
+ #include "glass/simd/avx2_utils.hpp"
+diff --git a/python/build_extension.py b/python/build_extension.py
+index 65e6196..20e3818 100644
+--- a/python/build_extension.py
++++ b/python/build_extension.py
+@@ -54,30 +54,72 @@ def cpp_flag(compiler):
+         )
+ 
+ 
+-class BuildExt(build_ext):
+-    """A custom build extension for adding compiler-specific options."""
++def _omp_flags(compiler, system):
++    """Return (compile_flags, link_flags) for OpenMP, portably.
+ 
+-    c_opts = {
+-        "unix": "-Ofast -lrt -march=native -fpic -fopenmp -ftree-vectorize -ftree-vectorizer-verbose=0".split()
+-    }
++    Linux gcc/clang ship libgomp/libomp (-fopenmp just works). Apple clang needs
++    Homebrew's libomp; if it isn't present we build single-threaded (the
++    ``#pragma omp`` directives are simply ignored) rather than failing the build.
++    """
++    if system == "Darwin":
++        for prefix in ("/opt/homebrew/opt/libomp", "/usr/local/opt/libomp"):
++            if os.path.isdir(prefix):
++                return (
++                    ["-Xpreprocessor", "-fopenmp", f"-I{prefix}/include"],
++                    [f"-L{prefix}/lib", "-lomp"],
++                )
++        print("glass build: libomp not found — building single-threaded "
++              "(`brew install libomp` for parallelism)")
++        return ([], [])
++    if has_flag(compiler, "-fopenmp"):
++        return (["-fopenmp"], ["-fopenmp"])
++    return ([], [])
+ 
+-    link_opts = {
+-        "unix": [],
+-    }
+ 
+-    c_opts["unix"].append("-fopenmp")
+-    link_opts["unix"].extend(["-fopenmp", "-pthread"])
++class BuildExt(build_ext):
++    """Portable build: per-arch SIMD baseline + OpenMP/rt handled per platform.
++
++    The upstream build hardcoded ``-march=native -lrt -fopenmp`` (x86/Linux only),
++    which bakes in the *builder's* ISA (e.g. AVX-512 → SIGILL elsewhere) and won't
++    link on macOS. Here we pick a portable baseline so one wheel per arch runs
++    across that whole arch:
++
++    * x86_64 → ``-mavx2 -mfma -mf16c`` (AVX2/Haswell 2013+; defines ``__AVX2__``,
++      not ``__AVX512F__`` → the AVX2 distance kernels). Override with
++      ``GLASS_MARCH`` (e.g. ``-march=native`` or AVX-512 for a tuned local build).
++    * aarch64/arm64 → no flag needed; NEON is implicit (``__aarch64__`` → the NEON
++      kernels). Apple Silicon and Graviton both covered.
++    """
+ 
+     def build_extensions(self):
+-        opts = self.c_opts.get("unix", [])
++        import platform
++
++        system = platform.system()
++        mach = platform.machine().lower()
++
++        opts = ["-Ofast", "-fPIC", "-ftree-vectorize"]
+         opts.append(f'-DVERSION_INFO="{self.distribution.get_version()}"')
+         opts.append(cpp_flag(self.compiler))
+         if has_flag(self.compiler, "-fvisibility=hidden"):
+             opts.append("-fvisibility=hidden")
+ 
++        march = os.environ.get("GLASS_MARCH")
++        if march:
++            opts.append(march)
++        elif mach in ("x86_64", "amd64"):
++            opts += ["-mavx2", "-mfma", "-mf16c"]
++        # arm64/aarch64: NEON is implicit (no -march needed).
++
++        link = ["-pthread"]
++        if system == "Linux":
++            link.append("-lrt")
++        omp_c, omp_l = _omp_flags(self.compiler, system)
++        opts += omp_c
++        link += omp_l
++
+         for ext in self.extensions:
+             ext.extra_compile_args.extend(opts)
+-            ext.extra_link_args.extend(self.link_opts.get("unix", []))
++            ext.extra_link_args.extend(link)
+ 
+         build_ext.build_extensions(self)
+ 
+diff --git a/third_party/helpa/helpa/platform/arm/l2_impl.hpp b/third_party/helpa/helpa/platform/arm/l2_impl.hpp
+index 1b44c06..b1e038d 100644
+--- a/third_party/helpa/helpa/platform/arm/l2_impl.hpp
++++ b/third_party/helpa/helpa/platform/arm/l2_impl.hpp
+@@ -324,6 +324,21 @@ l2a_u4_u4(const uint8_t* x, const uint8_t* y, const int32_t d) {
+ #endif
+ }
+ 
++// Portability fix: upstream defines l2a_u2_u2 only for x86. Provide a scalar
++// 2-bit-packed L2 (4 values/byte) so the symbol exists on arm too. Exact and
++// arch-neutral; the FP32 path never calls it, so speed here is irrelevant.
++inline int32_t
++l2a_u2_u2(const uint8_t* x, const uint8_t* y, const int32_t d) {
++    int32_t ans = 0;
++    for (int32_t i = 0; i < d; ++i) {
++        int32_t xx = (x[i / 4] >> ((i & 3) * 2)) & 0x3;
++        int32_t yy = (y[i / 4] >> ((i & 3) * 2)) & 0x3;
++        auto t = xx - yy;
++        ans += t * t;
++    }
++    return ans;
++}
++
+ }  // namespace helpa
+ 
+ #endif
