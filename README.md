@@ -394,6 +394,37 @@ it too. (At this 200k/2-core-runner scale the build gap is ~1.7×; at SIFT-1M on
 cores it was ~8× — the build advantage grows with `n`.) Net unchanged: PiPNN owns
 build-often/read-once; pyglass and FAISS own serve-many-queries, with pyglass fastest.
 
+### Real-data scale-out: Tahoe-100M (1M–3M cells)
+
+The synthetic sweeps above use Gaussian clusters; this one uses **real cells** from
+[Tahoe-100M](https://huggingface.co/datasets/tahoebio/Tahoe-100M) (a 100M-cell
+drug-perturbation atlas). `bench/tahoe_prep.py` streams raw counts → 2000-HVG
+panel → **PCA(50)** (the standard scanpy representation); `bench/bench_tahoe.py`
+then times the **self-kNN graph build** (build + self-query, k=15 — exactly what
+`sc.pp.neighbors` needs) for the three fastest engines, with recall@15 vs exact:
+
+![Tahoe-100M scanpy kNN: PiPNN vs pyglass vs FAISS HNSW](bench/tahoe_bench.png)
+
+| cells | PiPNN | pyglass | FAISS HNSW |
+|---|---|---|---|
+| 1M | 13.9s / 0.992 | **12.5s** / 0.987 | 37.3s / 0.992 |
+| 2M | 32.3s / 0.985 | **31.7s** / 0.980 | 84.8s / 0.986 |
+| 3M | 64.2s / 0.978 | **58.7s** / 0.974 | 136.1s / 0.980 |
+
+*(cells show `graph build time / recall@15`; 50-d PCA, 18-core M-series.)*
+
+- For the **scanpy self-kNN workload, PiPNN and pyglass build ~2.3× faster than
+  FAISS HNSW** at every scale (3M: ~60s vs 136s), at near-equal recall — the
+  build-time story from the synthetic sweeps holds on real cells.
+- **PiPNN and FAISS lead on recall** (~0.98–0.99); pyglass trails slightly (~0.97–0.99).
+- **Memory** (child peak at 3M): pyglass **2.6 GB**, FAISS 3.1 GB, PiPNN 11.7 GB —
+  PiPNN's per-point HashPrune reservoirs are the price of its build speed.
+
+Each backend runs in its own subprocess: PiPNN (rayon) and pyglass/FAISS (OpenMP)
+otherwise deadlock when sharing one process (multiple threading runtimes on macOS).
+The `pyglass` arm uses the portable [`tools/pyglass-portable`](tools/pyglass-portable)
+build — pyglass running natively on Apple Silicon.
+
 ## Metrics
 
 `euclidean` (default, matches scanpy on PCA space) and `cosine`.
