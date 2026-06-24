@@ -26,3 +26,5 @@ docker/out/
 
 # OS
 .DS_Store
+# Tahoe-100M dataset cache (parquet shards + PCA embedding, multi-GB)
+bench/tahoe_cache/
