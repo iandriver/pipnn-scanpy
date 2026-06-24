@@ -401,16 +401,17 @@ The synthetic sweeps above use Gaussian clusters; this one uses **real cells** f
 drug-perturbation atlas). `bench/tahoe_prep.py` streams raw counts → 2000-HVG
 panel → **PCA(50)** (the standard scanpy representation); `bench/bench_tahoe.py`
 then times the **self-kNN graph build** (build + self-query, k=15 — exactly what
-`sc.pp.neighbors` needs) for the three fastest engines, with recall@15 vs exact:
+`sc.pp.neighbors` needs), with recall@15 vs exact — including **pynndescent**,
+scanpy's default backend:
 
-![Tahoe-100M scanpy kNN: PiPNN vs pyglass vs FAISS HNSW](bench/tahoe_bench.png)
+![Tahoe-100M scanpy kNN: PiPNN vs pyglass vs FAISS HNSW vs pynndescent](bench/tahoe_bench.png)
 
-| cells | PiPNN | pyglass | FAISS HNSW | speedup vs FAISS |
+| cells | PiPNN | pyglass | FAISS HNSW | pynndescent |
 |---|---|---|---|---|
-| 1M | 14.5s / 0.992 | **13.2s** / 0.988 | 35.4s / 0.991 | 2.5× |
-| 2M | 33.1s / 0.985 | **30.4s** / 0.979 | 80.1s / 0.986 | 2.6× |
-| 3M | 51.8s / 0.978 | **50.8s** / 0.974 | 133.4s / 0.981 | 2.6× |
-| 5M | 94.4s / 0.967 | **92.4s** / 0.964 | 287.8s / 0.975 | 3.1× |
+| 1M | 14.5s / 0.992 | **13.2s** / 0.988 | 35.4s / 0.991 | 30.1s / 0.915 |
+| 2M | 33.1s / 0.985 | **30.4s** / 0.979 | 80.1s / 0.986 | 60.6s / 0.882 |
+| 3M | 51.8s / 0.978 | **50.8s** / 0.974 | 133.4s / 0.981 | 91.4s / 0.863 |
+| 5M | 94.4s / 0.967 | **92.4s** / 0.964 | 287.8s / 0.975 | 174.9s / 0.835 |
 
 *(cells show `graph build time / recall@15`; 50-d PCA, 18-core M-series.)*
 
@@ -419,14 +420,23 @@ then times the **self-kNN graph build** (build + self-query, k=15 — exactly wh
   ~93s vs FAISS's ~288s) at near-equal recall — the build-time story from the
   synthetic sweeps holds, and widens, on real cells.
 - **PiPNN and FAISS lead on recall** (~0.97–0.99); pyglass trails slightly.
-- **Memory** (child peak at 5M): pyglass **7.4 GB**, FAISS 5.3 GB, PiPNN 21.1 GB —
-  PiPNN's per-point HashPrune reservoirs are the price of its build speed (the one
-  axis where it's costly at scale).
+- **pynndescent (scanpy's default) reaches 5M but at a steep recall cost.** At
+  default settings its recall **collapses 0.915 → 0.835** as `n` grows — far below
+  the others — while build time lands between PiPNN/pyglass and FAISS. Matching the
+  others' recall needs more iterations/neighbors, i.e. much slower still. Memory is
+  *not* its limit here: it scales to 5M at **21.3 GB** (≈ PiPNN), never approaching
+  the 48 GB ceiling.
+- **Memory** (child peak at 5M): pyglass **7.4 GB**, FAISS 5.3 GB, PiPNN 21.1 GB,
+  pynndescent 21.3 GB — PiPNN's per-point HashPrune reservoirs are the price of its
+  build speed (the one axis where it's costly at scale).
 
 Each backend runs in its own subprocess: PiPNN (rayon) and pyglass/FAISS (OpenMP)
 otherwise deadlock when sharing one process (multiple threading runtimes on macOS).
 The `pyglass` arm uses the portable [`tools/pyglass-portable`](tools/pyglass-portable)
-build — pyglass running natively on Apple Silicon.
+build — pyglass running natively on Apple Silicon. `pynndescent`
+(`bench/tahoe_pynndescent.py`) runs in a separate venv pinned to a numba/numpy
+combo it compiles under, and needs a *writable* array (its numba kernels reject the
+read-only mmap views the others accept); one process per size keeps an OOM contained.
 
 ## Metrics
 
