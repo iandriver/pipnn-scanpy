@@ -179,23 +179,24 @@ def _plot(rows):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    names = ["PiPNN", "pyglass", "FAISS HNSW"]
     styles = {"PiPNN": ("o-", "#2a9d8f"), "pyglass": ("^-", "#e76f51"),
-              "FAISS HNSW": ("s-", "#3a7ca5")}
-    n = [r["n"] for r in rows]
+              "FAISS HNSW": ("s-", "#3a7ca5"), "pynndescent": ("D-", "#9467bd")}
+    names = [nm for nm in styles if any(nm in r for r in rows)]
     fig, ax = plt.subplots(1, 2, figsize=(13, 4.8))
     for nm in names:
         mk, c = styles[nm]
-        ax[0].plot(n, [r[nm]["s"] for r in rows], mk, color=c, label=nm)
-        ax[1].plot(n, [r[nm]["recall"] for r in rows], mk, color=c, label=nm)
+        pts = [r for r in rows if nm in r]  # a backend may stop early (e.g. OOM)
+        xs = [r["n"] for r in pts]
+        ax[0].plot(xs, [r[nm]["s"] for r in pts], mk, color=c, label=nm)
+        ax[1].plot(xs, [r[nm]["recall"] for r in pts], mk, color=c, label=nm)
     ax[0].set_xscale("log"); ax[0].set_yscale("log")
     ax[0].set_xlabel("cells"); ax[0].set_ylabel("kNN-graph build time (s)")
     ax[0].set_title("Self-kNN graph build time"); ax[0].grid(True, which="both", alpha=0.3); ax[0].legend()
     ax[1].set_xscale("log")
     ax[1].set_xlabel("cells"); ax[1].set_ylabel(f"recall@{K} vs exact")
     ax[1].set_title("Recall"); ax[1].grid(True, which="both", alpha=0.3); ax[1].legend()
-    fig.suptitle("Tahoe-100M scanpy kNN: PiPNN vs pyglass vs FAISS HNSW (real cells, 50-d PCA)",
-                 y=1.03, fontsize=12)
+    fig.suptitle("Tahoe-100M scanpy kNN: PiPNN vs pyglass vs FAISS HNSW vs pynndescent "
+                 "(real cells, 50-d PCA)", y=1.03, fontsize=12)
     plt.tight_layout()
     plt.savefig(os.path.join(HERE, "tahoe_bench.png"), dpi=120, bbox_inches="tight")
 
