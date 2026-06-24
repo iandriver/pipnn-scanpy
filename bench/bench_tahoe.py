@@ -137,6 +137,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sizes", type=int, nargs="+", default=[1_000_000, 2_000_000, 3_000_000])
     ap.add_argument("--source", type=int, default=3_000_000, help="which X_pca_<N>.npy to slice")
+    ap.add_argument("--cooldown", type=int, default=0,
+                    help="seconds to idle before each backend (thermal headroom on laptops)")
     args = ap.parse_args()
 
     src = os.path.join(CACHE, f"X_pca_{args.source}.npy")
@@ -154,6 +156,8 @@ def main():
         row = {"n": n}
         print(f"=== n={n:,} (d={X.shape[1]}) ===", flush=True)
         for name, fn in BACKENDS:
+            if args.cooldown:
+                time.sleep(args.cooldown)  # shed heat so build times aren't throttled
             t, rec, peak = run_isolated(fn, X, sub, ex)
             if t is None:
                 continue
