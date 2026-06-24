@@ -404,7 +404,11 @@ then times the **self-kNN graph build** (build + self-query, k=15 — exactly wh
 `sc.pp.neighbors` needs), with recall@15 vs exact — including **pynndescent**,
 scanpy's default backend:
 
-![Tahoe-100M scanpy kNN: PiPNN vs pyglass vs FAISS HNSW vs pynndescent](bench/tahoe_bench.png)
+![Tahoe-100M scanpy kNN dashboard: build time, recall, peak memory, throughput](bench/tahoe_dashboard.png)
+
+*(All four axes side by side — build time, recall, peak memory vs the 48 GB
+machine ceiling, and throughput. `bench/tahoe_plot_all.py` regenerates it from
+`tahoe_bench.json`; `bench/tahoe_bench.png` is the compact build-time + recall pair.)*
 
 | cells | PiPNN | pyglass | FAISS HNSW | pynndescent |
 |---|---|---|---|---|
