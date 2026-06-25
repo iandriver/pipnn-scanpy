@@ -412,27 +412,27 @@ machine ceiling, and throughput. `bench/tahoe_plot_all.py` regenerates it from
 
 | cells | PiPNN | pyglass | FAISS HNSW | pynndescent |
 |---|---|---|---|---|
-| 1M | 14.5s / 0.992 | **13.2s** / 0.988 | 35.4s / 0.991 | 30.1s / 0.915 |
-| 2M | 33.1s / 0.985 | **30.4s** / 0.979 | 80.1s / 0.986 | 60.6s / 0.882 |
-| 3M | 51.8s / 0.978 | **50.8s** / 0.974 | 133.4s / 0.981 | 91.4s / 0.863 |
-| 5M | 94.4s / 0.967 | **92.4s** / 0.964 | 287.8s / 0.975 | 174.9s / 0.835 |
+| 1M | **12.0s** / 0.992 · 2.7 GB | 13.2s / 0.988 · 0.9 GB | 35.4s / 0.991 · 1.1 GB | 30.1s / 0.915 · 4.9 GB |
+| 2M | **27.6s** / 0.985 · 5.2 GB | 30.4s / 0.979 · 1.8 GB | 80.1s / 0.986 · 2.2 GB | 60.6s / 0.882 · 9.3 GB |
+| 3M | **45.6s** / 0.978 · 7.6 GB | 50.8s / 0.974 · 2.6 GB | 133.4s / 0.981 · 3.2 GB | 91.4s / 0.863 · 13.7 GB |
+| 5M | **77.4s** / 0.967 · 12.5 GB | 92.4s / 0.964 · 7.4 GB | 287.8s / 0.975 · 5.3 GB | 174.9s / 0.835 · 21.3 GB |
 
-*(cells show `graph build time / recall@15`; 50-d PCA, 18-core M-series.)*
+*(cells show `graph build time / recall@15 · peak memory`; 50-d PCA, 18-core M-series.)*
 
-- For the **scanpy self-kNN workload, PiPNN and pyglass build ~2.5–3× faster than
-  FAISS HNSW**, and the gap **grows with scale** (2.5× at 1M → 3.1× at 5M; 5M is
-  ~93s vs FAISS's ~288s) at near-equal recall — the build-time story from the
-  synthetic sweeps holds, and widens, on real cells.
+- **PiPNN builds fastest at every scale**, ~2.5–3.7× faster than FAISS HNSW and the
+  gap **grows with `n`** (5M: ~77s vs FAISS's ~288s) at near-equal recall — the
+  build-time story from the synthetic sweeps holds, and widens, on real cells.
 - **PiPNN and FAISS lead on recall** (~0.97–0.99); pyglass trails slightly.
 - **pynndescent (scanpy's default) reaches 5M but at a steep recall cost.** At
   default settings its recall **collapses 0.915 → 0.835** as `n` grows — far below
-  the others — while build time lands between PiPNN/pyglass and FAISS. Matching the
-  others' recall needs more iterations/neighbors, i.e. much slower still. Memory is
-  *not* its limit here: it scales to 5M at **21.3 GB** (≈ PiPNN), never approaching
-  the 48 GB ceiling.
-- **Memory** (child peak at 5M): pyglass **7.4 GB**, FAISS 5.3 GB, PiPNN 21.1 GB,
-  pynndescent 21.3 GB — PiPNN's per-point HashPrune reservoirs are the price of its
-  build speed (the one axis where it's costly at scale).
+  the others — while build time lands between PiPNN and FAISS. Matching the others'
+  recall needs more iterations/neighbors, i.e. much slower still. Memory is *not*
+  its limit here: it scales to 5M at **21.3 GB**, never approaching the 48 GB ceiling.
+- **Memory** (child peak at 5M): FAISS **5.3 GB**, pyglass 7.4 GB, PiPNN 12.5 GB,
+  pynndescent 21.3 GB. PiPNN is heavier than the flat-array HNSWs (its per-point
+  HashPrune reservoirs + candidate graph) but **~40 % lighter than before** — a flat
+  CSR build pipeline (no `Vec<Vec>` clone/triple) plus `l_max 96 → 64` cut 5M from
+  21 → 12.5 GB *and* shaved ~17 % off build time, with recall unchanged.
 
 Each backend runs in its own subprocess: PiPNN (rayon) and pyglass/FAISS (OpenMP)
 otherwise deadlock when sharing one process (multiple threading runtimes on macOS).

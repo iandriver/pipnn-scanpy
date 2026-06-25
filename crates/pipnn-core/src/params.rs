@@ -7,7 +7,9 @@ pub struct BuildParams {
     pub metric: Metric,
     /// Number of LSH hyperplanes `m` for HashPrune residual codes (8–16; 12 default).
     pub m: usize,
-    /// Per-point reservoir capacity `ℓ_max` (64–192; 96 default).
+    /// Per-point reservoir capacity `ℓ_max` (64–192). 64 default — the reservoir
+    /// is pre-allocated (8·ℓ_max·n bytes), so this directly sets that share of
+    /// peak RSS; 64 keeps recall while trimming it vs the paper's looser 96.
     pub l_max: usize,
     /// Max out-degree `R` of the final graph after RobustPrune (64 default).
     pub r: usize,
@@ -36,7 +38,7 @@ impl Default for BuildParams {
         BuildParams {
             metric: Metric::L2,
             m: 12,
-            l_max: 96,
+            l_max: 64,
             r: 64,
             alpha: 1.2,
             fanout: 2,
