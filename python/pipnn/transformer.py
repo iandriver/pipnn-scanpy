@@ -58,7 +58,7 @@ class PiPNNTransformer(TransformerMixin, BaseEstimator):
         *,
         metric: str = "euclidean",
         m: int = 12,
-        l_max: int = 96,
+        l_max: int = 64,
         R: int = 64,
         alpha: float = 1.2,
         beam_L: int = 64,

@@ -138,60 +138,131 @@ pub fn build_index_with_cands(
     }
     lap!("leaf+hashprune", t);
 
-    // Alg 4 line 8 ("PruneNode"): RobustPrune each reservoir to ≤ R out-edges.
-    // Optionally stash each point's top-`m_cands` nearest candidates first (the
-    // self-kNN seed) — RobustPrune mutates/consumes the sorted list.
-    let (out_adj, self_cands): (Vec<Vec<Id>>, Vec<Vec<(Id, f32)>>) = reservoirs
+    // Alg 4 line 8 ("PruneNode"): RobustPrune each reservoir to ≤ R out-edges,
+    // written into one flat fixed-stride buffer (`out_idx`, stride r; `out_deg`
+    // valid entries/node) rather than a `Vec<Vec>` — millions of tiny per-point
+    // allocations were a large share of peak RSS. Optionally stash each point's
+    // top-`m_cands` nearest candidates first (the self-kNN seed); RobustPrune
+    // mutates/consumes the sorted list.
+    let r = p.r;
+    let mut out_idx = vec![Id::MAX; n * r];
+    let mut out_deg = vec![0u32; n];
+    let self_cands: Vec<Vec<(Id, f32)>> = reservoirs
         .into_par_iter()
+        .zip(out_idx.par_chunks_mut(r))
+        .zip(out_deg.par_iter_mut())
         .enumerate()
-        .map(|(x, res)| {
+        .map(|(x, ((res, slot), deg))| {
             let mut c = res.into_inner().unwrap().into_sorted();
             let cands = if m_cands > 0 {
                 c.iter().take(m_cands).copied().collect()
             } else {
                 Vec::new()
             };
-            let adj = robust_prune(data, x as Id, &mut c, p.alpha, p.r);
-            (adj, cands)
+            let adj = robust_prune(data, x as Id, &mut c, p.alpha, r);
+            slot[..adj.len()].copy_from_slice(&adj);
+            *deg = adj.len() as u32;
+            cands
         })
-        .unzip();
+        .collect();
     lap!("robustprune", t);
 
-    // Symmetrize for navigability (Vamana-style reverse edges), then cap degree.
-    let final_adj = symmetrize(data, &out_adj, p.r);
+    // Symmetrize (Vamana reverse edges) + degree-cap, assembling the CSR graph
+    // directly from flat buffers — no Vec<Vec> clone/triple.
     let entry = approx_medoid(data);
+    let graph = symmetrize_flat(data, &out_idx, &out_deg, n, r, entry);
     lap!("symmetrize", t);
-    (Graph::from_adjacency(final_adj, entry), self_cands)
+    (graph, self_cands)
 }
 
-/// Add reverse edges and cap each node's degree at `r` by keeping its `r`
-/// closest neighbors. Keeps the graph strongly connected for BeamSearch.
-fn symmetrize(data: &Dataset, out_adj: &[Vec<Id>], r: usize) -> Vec<Vec<Id>> {
-    let n = out_adj.len();
-    let mut sets: Vec<Vec<Id>> = out_adj.to_vec();
-    for (x, nbrs) in out_adj.iter().enumerate() {
-        for &y in nbrs {
-            sets[y as usize].push(x as Id);
+/// Add reverse edges, dedup, and cap each node to its `r` closest neighbors,
+/// assembling the CSR [`Graph`] directly from the flat fixed-stride out-edge
+/// buffer (`out_idx`, stride `r`; `out_deg[x]` valid entries/node). All scratch
+/// is flat (counting-sort) instead of per-node `Vec`s, keeping peak RSS low.
+fn symmetrize_flat(
+    data: &Dataset,
+    out_idx: &[Id],
+    out_deg: &[u32],
+    n: usize,
+    r: usize,
+    entry: Id,
+) -> Graph {
+    // 1. Degree of the symmetric multigraph: own out-edges + incoming reverses.
+    let mut cnt = vec![0u32; n];
+    for x in 0..n {
+        let dx = out_deg[x] as usize;
+        cnt[x] += dx as u32;
+        for &y in &out_idx[x * r..x * r + dx] {
+            cnt[y as usize] += 1;
         }
     }
-    (0..n)
-        .into_par_iter()
-        .map(|x| {
-            let mut v = sets[x].clone();
-            v.sort_unstable();
-            v.dedup();
-            v.retain(|&y| y as usize != x);
-            if v.len() > r {
-                let mut withd: Vec<(f32, Id)> = v
-                    .iter()
-                    .map(|&y| (data.sq_dist(x, y as usize), y))
-                    .collect();
-                withd.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap().then(a.1.cmp(&b.1)));
-                withd.truncate(r);
-                withd.into_iter().map(|(_, y)| y).collect()
-            } else {
-                v
-            }
-        })
-        .collect()
+    // 2. Counting-sort fill into one flat buffer `tidx` (≤ 2·n·R entries).
+    let mut toff = vec![0usize; n + 1];
+    for i in 0..n {
+        toff[i + 1] = toff[i] + cnt[i] as usize;
+    }
+    let mut tidx = vec![0 as Id; toff[n]];
+    let mut cur: Vec<usize> = toff[..n].to_vec();
+    for x in 0..n {
+        let dx = out_deg[x] as usize;
+        for &y in &out_idx[x * r..x * r + dx] {
+            tidx[cur[x]] = y;
+            cur[x] += 1;
+            let yi = y as usize;
+            tidx[cur[yi]] = x as Id;
+            cur[yi] += 1;
+        }
+    }
+    drop(cur);
+    drop(cnt);
+
+    // 3. Per-node dedup + drop self + keep the r closest → fixed-stride `fpad`.
+    //    Reusable per-thread scratch (no per-node allocation).
+    let mut fpad = vec![Id::MAX; n * r];
+    let mut fdeg = vec![0u32; n];
+    fpad.par_chunks_mut(r)
+        .zip(fdeg.par_iter_mut())
+        .enumerate()
+        .for_each_init(
+            || (Vec::<Id>::with_capacity(2 * r), Vec::<(f32, Id)>::with_capacity(2 * r)),
+            |(buf, withd), (x, (slot, deg))| {
+                buf.clear();
+                buf.extend(
+                    tidx[toff[x]..toff[x + 1]]
+                        .iter()
+                        .copied()
+                        .filter(|&y| y as usize != x),
+                );
+                buf.sort_unstable();
+                buf.dedup();
+                let k = if buf.len() > r {
+                    withd.clear();
+                    withd.extend(buf.iter().map(|&y| (data.sq_dist(x, y as usize), y)));
+                    withd.select_nth_unstable_by(r, |a, b| a.0.partial_cmp(&b.0).unwrap());
+                    for (i, &(_, y)) in withd[..r].iter().enumerate() {
+                        slot[i] = y;
+                    }
+                    r
+                } else {
+                    slot[..buf.len()].copy_from_slice(buf);
+                    buf.len()
+                };
+                *deg = k as u32;
+            },
+        );
+    drop(tidx);
+    drop(toff);
+
+    // 4. Compact the fixed-stride buffer into the final CSR (one pass).
+    let mut indptr = vec![0usize; n + 1];
+    for i in 0..n {
+        indptr[i + 1] = indptr[i] + fdeg[i] as usize;
+    }
+    let mut indices = vec![0 as Id; indptr[n]];
+    for x in 0..n {
+        let k = fdeg[x] as usize;
+        let dst = indptr[x];
+        indices[dst..dst + k].copy_from_slice(&fpad[x * r..x * r + k]);
+    }
+    Graph { indptr, indices, entry }
 }

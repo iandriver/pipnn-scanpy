@@ -26,7 +26,7 @@ use pipnn_core::{
 #[allow(clippy::too_many_arguments)]
 #[pyo3(signature = (
     x, n_neighbors, metric="euclidean",
-    m=12, l_max=96, r=64, alpha=1.2, beam_l=64,
+    m=12, l_max=64, r=64, alpha=1.2, beam_l=64,
     fanout=2, c_min=256, c_max=2048, runs=1, n_jobs=0, seed=0,
 ))]
 fn build_and_self_knn<'py>(
@@ -211,7 +211,7 @@ fn hnsw_self_knn<'py>(
 #[allow(clippy::too_many_arguments)]
 #[pyo3(signature = (
     x, queries, n_neighbors, metric="euclidean",
-    m=12, l_max=96, r=64, alpha=1.2, beam_l=64,
+    m=12, l_max=64, r=64, alpha=1.2, beam_l=64,
     fanout=2, c_min=256, c_max=2048, runs=1, n_jobs=0, seed=0,
 ))]
 fn build_and_query<'py>(
@@ -326,7 +326,7 @@ impl PiPNNIndex {
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
         x, metric="euclidean",
-        m=12, l_max=96, r=64, alpha=1.2,
+        m=12, l_max=64, r=64, alpha=1.2,
         fanout=2, c_min=256, c_max=2048, runs=1, n_jobs=0, seed=0,
     ))]
     fn new(

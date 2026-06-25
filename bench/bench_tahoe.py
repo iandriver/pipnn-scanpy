@@ -139,11 +139,18 @@ def main():
     ap.add_argument("--source", type=int, default=3_000_000, help="which X_pca_<N>.npy to slice")
     ap.add_argument("--cooldown", type=int, default=0,
                     help="seconds to idle before each backend (thermal headroom on laptops)")
+    ap.add_argument("--backends", default="",
+                    help="comma list to run (default all); others kept from existing json")
     args = ap.parse_args()
 
     src = os.path.join(CACHE, f"X_pca_{args.source}.npy")
     full = np.load(src, mmap_mode="r")
     print(f"loaded {src}: {full.shape}\n")
+
+    selected = [b for b in BACKENDS if not args.backends or b[0] in args.backends.split(",")]
+    out = os.path.join(HERE, "tahoe_bench.json")
+    # Merge into existing results so a single-backend re-run updates just its rows.
+    existing = {r["n"]: r for r in json.load(open(out))} if os.path.exists(out) else {}
 
     rows = []
     for n in args.sizes:
@@ -153,9 +160,9 @@ def main():
         X = np.ascontiguousarray(full[:n], dtype=np.float32)
         sub = np.random.default_rng(1).choice(n, min(n, 4000), replace=False)
         ex = exact_isolated(X, sub)
-        row = {"n": n}
+        row = existing.get(n, {"n": n})  # preserve unselected backends
         print(f"=== n={n:,} (d={X.shape[1]}) ===", flush=True)
-        for name, fn in BACKENDS:
+        for name, fn in selected:
             if args.cooldown:
                 time.sleep(args.cooldown)  # shed heat so build times aren't throttled
             t, rec, peak = run_isolated(fn, X, sub, ex)
@@ -167,7 +174,7 @@ def main():
         rows.append(row)
         del X, ex
         gc.collect()
-        with open(os.path.join(HERE, "tahoe_bench.json"), "w") as f:
+        with open(out, "w") as f:
             json.dump(rows, f, indent=2)
 
     _plot(rows)
