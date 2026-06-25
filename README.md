@@ -394,7 +394,7 @@ it too. (At this 200k/2-core-runner scale the build gap is ~1.7×; at SIFT-1M on
 cores it was ~8× — the build advantage grows with `n`.) Net unchanged: PiPNN owns
 build-often/read-once; pyglass and FAISS own serve-many-queries, with pyglass fastest.
 
-### Real-data scale-out: Tahoe-100M (1M–5M cells)
+### Real-data scale-out: Tahoe-100M (1M–10M cells)
 
 The synthetic sweeps above use Gaussian clusters; this one uses **real cells** from
 [Tahoe-100M](https://huggingface.co/datasets/tahoebio/Tahoe-100M) (a 100M-cell
@@ -416,22 +416,28 @@ machine ceiling, and throughput. `bench/tahoe_plot_all.py` regenerates it from
 | 2M | **26.9s** / 0.985 · 4.2 GB | 30.4s / 0.979 · 1.8 GB | 80.1s / 0.986 · 2.2 GB | 60.6s / 0.882 · 9.3 GB |
 | 3M | **43.2s** / 0.978 · 6.1 GB | 50.8s / 0.974 · 2.6 GB | 133.4s / 0.981 · 3.2 GB | 91.4s / 0.863 · 13.7 GB |
 | 5M | **77.5s** / 0.967 · 10.2 GB | 92.4s / 0.964 · 7.4 GB | 287.8s / 0.975 · 5.3 GB | 174.9s / 0.835 · 21.3 GB |
+| 10M | **219s** / 0.943 · 19.4 GB | 228s / 0.950 · 13.5 GB | 533s / **0.963** · 10.7 GB | 344s / 0.796 · 27.7 GB |
 
 *(cells show `graph build time / recall@15 · peak memory`; 50-d PCA, 18-core M-series.)*
 
-- **PiPNN builds fastest at every scale**, ~2.5–3.7× faster than FAISS HNSW and the
-  gap **grows with `n`** (5M: ~78s vs FAISS's ~288s) at near-equal recall — the
-  build-time story from the synthetic sweeps holds, and widens, on real cells.
-- **PiPNN and FAISS lead on recall** (~0.97–0.99); pyglass trails slightly.
-- **pynndescent (scanpy's default) reaches 5M but at a steep recall cost.** At
-  default settings its recall **collapses 0.915 → 0.835** as `n` grows — far below
-  the others — while build time lands between PiPNN and FAISS. Matching the others'
-  recall needs more iterations/neighbors, i.e. much slower still. Memory is *not*
-  its limit here: it scales to 5M at **21.3 GB**, never approaching the 48 GB ceiling.
-- **Memory** (child peak at 5M): FAISS **5.3 GB**, pyglass 7.4 GB, PiPNN 10.2 GB,
-  pynndescent 21.3 GB. PiPNN is heavier than the flat-array HNSWs (its per-point
-  HashPrune reservoirs) but successive passes have cut it hard — a flat CSR build
-  pipeline + `l_max 96→64`, then dropping the unused self-kNN warm-start seed
+- **PiPNN builds fastest at every scale** — ~2.5–3.7× faster than FAISS HNSW up to
+  5M; by 10M it still leads but pyglass has caught up (219s vs 228s) as both go
+  super-linear.
+- **Recall: PiPNN leads through 5M, then the lines cross.** Through 5M PiPNN ties
+  FAISS at the top (~0.97–0.99, both above pyglass). But PiPNN's recall **decays
+  faster with `n`** — by 10M it sits *below* both (0.943 vs pyglass 0.950, FAISS
+  0.963). Its flat navigable graph (beam width fixed at `beam_L=64`) loses ground to
+  the hierarchical HNSWs once the graph is tens of millions of nodes; a wider beam
+  recovers it but costs the speed lead. This is the same navigability ceiling the
+  SIFT cold-query section flagged, now visible on the self-kNN side at scale.
+- **pynndescent (scanpy's default) never hits the memory wall, but recall does.**
+  Its memory scales *sub*-linearly (low-memory mode) — 5M 21.3 GB → 10M only 27.7 GB,
+  still under the 48 GB ceiling — yet recall **collapses 0.915 → 0.796** as `n`
+  grows, far below the others throughout.
+- **Memory** (child peak at 10M): FAISS **10.7 GB**, pyglass 13.5 GB, PiPNN 19.4 GB,
+  pynndescent 27.7 GB. PiPNN is heavier than the flat-array HNSWs (its per-point
+  HashPrune reservoirs) but successive passes cut it hard — a flat CSR build pipeline
+  + `l_max 96→64`, then dropping the unused self-kNN warm-start seed
   (`PIPNN_QUERY=beam`, identical recall) and a zero-copy NumPy ingest, took 5M from
   **21 → 10.2 GB** with recall unchanged. The remaining lever is **`R`** (graph
   degree, default 64): lowering it shrinks the graph further and speeds build/query

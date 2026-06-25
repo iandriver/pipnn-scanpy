@@ -152,7 +152,6 @@ def main():
     # Merge into existing results so a single-backend re-run updates just its rows.
     existing = {r["n"]: r for r in json.load(open(out))} if os.path.exists(out) else {}
 
-    rows = []
     for n in args.sizes:
         if n > len(full):
             print(f"skip {n:,} (only {len(full):,} cells available)")
@@ -160,7 +159,7 @@ def main():
         X = np.ascontiguousarray(full[:n], dtype=np.float32)
         sub = np.random.default_rng(1).choice(n, min(n, 4000), replace=False)
         ex = exact_isolated(X, sub)
-        row = existing.get(n, {"n": n})  # preserve unselected backends
+        row = existing.get(n, {"n": n})  # preserve unselected backends / other sizes
         print(f"=== n={n:,} (d={X.shape[1]}) ===", flush=True)
         for name, fn in selected:
             if args.cooldown:
@@ -171,12 +170,15 @@ def main():
             row[name] = {"s": t, "recall": rec, "peak_gb": peak}
             print(f"  {name:11s} {t:7.2f}s  recall@{K}={rec:.4f}  [child peak {peak:.1f}GB]", flush=True)
             gc.collect()
-        rows.append(row)
+        existing[n] = row
         del X, ex
         gc.collect()
+        # write the FULL set (all sizes), not just the ones run this invocation
+        all_rows = [existing[k] for k in sorted(existing)]
         with open(out, "w") as f:
-            json.dump(rows, f, indent=2)
+            json.dump(all_rows, f, indent=2)
 
+    rows = [existing[k] for k in sorted(existing)]
     _plot(rows)
     print("\nwrote bench/tahoe_bench.{json,png}")
 
