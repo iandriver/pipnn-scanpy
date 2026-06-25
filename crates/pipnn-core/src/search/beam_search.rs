@@ -88,8 +88,14 @@ pub fn beam_search(
         let p = beam[k].1;
         scratch.visited[p as usize] = true;
 
-        // Line 5: add neighbors of p.
-        for &nbr in graph.neighbors(p as usize) {
+        // Line 5: add neighbors of p. Prefetch the next neighbor's vector while
+        // scoring the current one — graph edges point all over the dataset, so
+        // these are scattered random loads and hiding the latency is a big win.
+        let nbrs = graph.neighbors(p as usize);
+        for (k, &nbr) in nbrs.iter().enumerate() {
+            if let Some(&next) = nbrs.get(k + 1) {
+                data.prefetch_row(next as usize);
+            }
             let ni = nbr as usize;
             if scratch.in_beam[ni] {
                 continue;

@@ -12,6 +12,11 @@ pub struct BuildParams {
     /// peak RSS; 64 keeps recall while trimming it vs the paper's looser 96.
     pub l_max: usize,
     /// Max out-degree `R` of the final graph after RobustPrune (64 default).
+    /// Sets the size of every graph buffer (out-edges, symmetrize scratch, final
+    /// CSR) and the per-query expansion cost, so it's the main recall ↔
+    /// memory/speed dial: lowering it (e.g. 48/32) shrinks the graph and speeds
+    /// build/query but drops recall, increasingly so at scale (5M recall ~0.967
+    /// at 64 → ~0.93 at 32). 64 keeps recall competitive with tuned HNSW.
     pub r: usize,
     /// RobustPrune slack `α` (≈1.2).
     pub alpha: f32,
