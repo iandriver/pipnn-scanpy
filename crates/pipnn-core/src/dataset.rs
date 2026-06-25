@@ -59,6 +59,23 @@ impl<'a> Dataset<'a> {
         &self.data
     }
 
+    /// Prefetch row `i`'s vector into L1 (hides the latency of the scattered
+    /// graph-neighbor loads in BeamSearch). No-op on unsupported targets.
+    #[inline(always)]
+    pub fn prefetch_row(&self, i: usize) {
+        let ptr = unsafe { self.data.as_ptr().add(i * self.d) };
+        #[cfg(target_arch = "x86_64")]
+        unsafe {
+            core::arch::x86_64::_mm_prefetch::<{ core::arch::x86_64::_MM_HINT_T0 }>(ptr as *const i8);
+        }
+        #[cfg(target_arch = "aarch64")]
+        unsafe {
+            core::arch::asm!("prfm pldl1keep, [{0}]", in(reg) ptr, options(nostack, preserves_flags));
+        }
+        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+        let _ = ptr;
+    }
+
     /// Squared-L2 distance between two stored rows (the ranking quantity).
     #[inline]
     pub fn sq_dist(&self, i: usize, j: usize) -> f32 {

@@ -54,9 +54,17 @@ fn build_and_self_knn<'py>(
     if n == 0 {
         return Err(PyValueError::new_err("empty input matrix"));
     }
-    // Contiguous row-major copy into a Vec the Rust side owns (numpy may be
-    // non-contiguous; a single copy keeps the hot path simple).
-    let flat: Vec<f32> = arr.iter().copied().collect();
+    // Borrow the numpy buffer directly when it is C-contiguous (the common case —
+    // the Python wrappers call np.ascontiguousarray). Avoids a full n·d copy
+    // (~1 GB at 5M·50). Only non-contiguous input falls back to an owned copy.
+    let owned_fallback: Vec<f32>;
+    let flat: &[f32] = match x.as_slice() {
+        Ok(s) => s,
+        Err(_) => {
+            owned_fallback = arr.iter().copied().collect();
+            &owned_fallback
+        }
+    };
 
     let bp = BuildParams {
         metric,
@@ -83,19 +91,26 @@ fn build_and_self_knn<'py>(
     };
 
     let knn = py.detach(|| {
-        let data = Dataset::new(&flat, n, d, metric);
+        let data = Dataset::new(flat, n, d, metric);
         let run = || {
             // Tiny inputs: skip the graph and answer exactly (also the recall oracle).
             if n <= bp.c_max.min(2048) && n <= 4096 {
                 knn_self_bruteforce(&data, n_neighbors)
             } else {
                 let prof = std::env::var("PIPNN_PROFILE").is_ok();
-                // Query method (override with PIPNN_QUERY). Default "warm":
-                // BeamSearch seeded from each point's reservoir candidates (high
-                // recall, fast). "reservoir": candidates + 1-hop only (fastest,
-                // lower recall). "beam": cold BeamSearch from the point alone.
-                let method = std::env::var("PIPNN_QUERY").unwrap_or_else(|_| "warm".into());
-                let m_cands = (n_neighbors + 1).max(32).min(bp.l_max);
+                // Query method (override with PIPNN_QUERY). Default "beam":
+                // BeamSearch seeded from each point itself — it's a graph node, so
+                // the search starts in its own neighborhood. Empirically identical
+                // recall to the reservoir warm-start, but skips stashing per-point
+                // candidates (m_cands = 0), saving ~8·m_cands·n bytes (~1.3 GB at
+                // 5M). "warm": add the reservoir candidates as extra seeds.
+                // "reservoir": candidates + 1-hop only (fastest, lower recall).
+                let method = std::env::var("PIPNN_QUERY").unwrap_or_else(|_| "beam".into());
+                let m_cands = if method == "beam" {
+                    0
+                } else {
+                    (n_neighbors + 1).max(32).min(bp.l_max)
+                };
 
                 let t = std::time::Instant::now();
                 let (graph, cands) = build_index_with_cands(&data, &bp, m_cands);
@@ -103,8 +118,8 @@ fn build_and_self_knn<'py>(
                 let t2 = std::time::Instant::now();
                 let r = match method.as_str() {
                     "reservoir" => knn_self_reservoir(&data, &graph, &cands, n_neighbors, true),
-                    "beam" => knn_self_graph(&data, &graph, None, n_neighbors, &sp),
-                    _ => knn_self_graph(&data, &graph, Some(&cands), n_neighbors, &sp),
+                    "warm" => knn_self_graph(&data, &graph, Some(&cands), n_neighbors, &sp),
+                    _ => knn_self_graph(&data, &graph, None, n_neighbors, &sp),
                 };
                 if prof {
                     eprintln!(
