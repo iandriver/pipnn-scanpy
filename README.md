@@ -81,27 +81,36 @@ vs pynndescent ≈ 0.51s (the previously-quoted "4.7×" was almost entirely numb
 JIT — the corrected warm numbers are ~par at this size; PiPNN's advantage grows
 with `n`). recall@15 0.9997 vs 0.9948; ARI-to-exact 0.94 vs 0.92.
 
-### pyglass on Apple Silicon
+### pyglass as a scanpy backend (portable build)
 
-pyglass ships only manylinux x86_64 wheels (`glassppy`, CPython 3.10) and its
-source assumes x86 intrinsics, so it does not run natively on arm64 macOS.
-`python/pipnn/contrib/glass.py` (`GlassTransformer`) activates automatically
-wherever `glassppy`/`glass` imports.
+`GlassTransformer` (`pipnn.contrib`) wraps pyglass as a drop-in scanpy backend,
+exactly like `PiPNNTransformer`:
 
-The bundled `docker/Dockerfile` (linux/amd64, py3.10) builds a complete 4-backend
-image — it installs `glassppy`, compiles `pipnn`, and runs `docker_compare.py`:
-
-```bash
-docker build --platform linux/amd64 -t pipnn-bench -f docker/Dockerfile .
-docker run --platform linux/amd64 --rm -v "$PWD/docker/out:/out" pipnn-bench
+```python
+import scanpy as sc
+from pipnn.contrib import GlassTransformer
+sc.pp.neighbors(adata, n_neighbors=15, transformer=GlassTransformer())
 ```
 
-**Run this on x86_64 hardware** (a native Linux box or CI). On an arm64 host the
-container runs under qemu emulation, where glass's SIMD/OpenMP code is ~1000×
-slower (an `n=1000` build did not finish in 14 min) — verified that glassppy
-installs and the `GlassTransformer` API matches, but the benchmark is not
-runnable under emulation. The native notebook (PiPNN/pynndescent/exact) is the
-authoritative timing comparison on Apple Silicon.
+Upstream pyglass publishes only **AVX-512** x86_64 wheels (`glassppy`, CPython
+3.10), which `SIGILL` on CPUs without AVX-512 — Apple Silicon, AMD, older Intel.
+The pyglass *source* is portable (it ships AVX2 / NEON / scalar kernels), so
+[`tools/pyglass-portable`](tools/pyglass-portable) patches the build and compiles
+a wheel for the local CPU:
+
+```bash
+PYTHON=python3.12 tools/pyglass-portable/build_wheel.sh   # → an installable `glass` wheel
+```
+
+This runs **natively** on Apple Silicon (NEON) and AMD / x86 (AVX2). Once it's
+installed, `GlassTransformer` activates automatically (it imports `glass` or
+`glassppy`), so pyglass works in `sc.pp.neighbors` the same way PiPNN does — that
+is how the pyglass column in the Tahoe benchmark above was produced, on an
+Apple-Silicon Mac. `.github/workflows/pyglass-portable-wheels.yml` builds and
+smoke-tests these wheels across linux-x86_64 / macOS-arm64 / macOS-x86_64.
+
+(The older `docker/Dockerfile` still builds a full x86_64 image, but the portable
+wheel makes native runs the simpler path — no Docker or emulation needed.)
 
 ## Scaling: PiPNN vs pynndescent
 
