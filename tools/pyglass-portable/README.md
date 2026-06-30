@@ -57,6 +57,25 @@ Clones upstream at the pinned commit, applies `portable.patch`, builds in-place
 (`bdist_wheel`, so setup.py's `../glass` references resolve), and `delocate`/
 `auditwheel`-repairs the result. The import name stays **`glass`** (drop-in).
 
+## Use it as a scanpy NN backend
+
+Install the wheel, and pyglass works as a drop-in `sc.pp.neighbors` backend via
+`GlassTransformer` — the same pattern as `PiPNNTransformer`:
+
+```bash
+pip install wheelhouse/glass-*.whl
+```
+
+```python
+import scanpy as sc
+from pipnn.contrib import GlassTransformer
+sc.pp.neighbors(adata, n_neighbors=15, transformer=GlassTransformer())
+```
+
+`GlassTransformer` imports `glass` (this build) or `glassppy` automatically, so no
+other change is needed. This is how the pyglass column in the Tahoe-100M
+benchmark was run, natively on Apple Silicon.
+
 ## Multi-arch wheels (CI)
 
 `.github/workflows/pyglass-portable-wheels.yml` (`workflow_dispatch`) runs the
