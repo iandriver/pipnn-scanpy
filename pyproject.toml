@@ -4,26 +4,49 @@ build-backend = "maturin"
 
 [project]
 name = "pipnn"
-version = "0.1.0"
-description = "Fast graph-based nearest-neighbor indexing (PiPNN) for single-cell / scanpy data"
-readme = "README.md"
+dynamic = ["version"] # single-sourced from Cargo.toml [package].version
+description = "Fast graph-based approximate nearest-neighbor indexing for single-cell / scanpy — a Rust implementation of the PiPNN method"
+readme = "README_pypi.md"
 requires-python = ">=3.9"
-license = { text = "MIT" }
-authors = [{ name = "PiPNN module" }]
+license = { file = "LICENSE" }
+authors = [{ name = "Ian Driver" }]
+keywords = [
+    "nearest-neighbors", "knn", "ann", "approximate-nearest-neighbors",
+    "single-cell", "scanpy", "vector-search", "hnsw", "rust", "bioinformatics",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "numpy>=1.23",
     "scipy>=1.9",
     "scikit-learn>=1.2",
 ]
 
+[project.urls]
+Homepage = "https://github.com/iandriver/pipnn-scanpy"
+Repository = "https://github.com/iandriver/pipnn-scanpy"
+Issues = "https://github.com/iandriver/pipnn-scanpy/issues"
+Paper = "https://arxiv.org/abs/2602.21247"
+
 [project.optional-dependencies]
 scanpy = ["scanpy>=1.10", "anndata>=0.9"]
+faiss = ["faiss-cpu>=1.8"]
 test = ["pytest>=7", "scanpy>=1.10", "pynndescent>=0.5"]
 bench = ["pynndescent>=0.5", "faiss-cpu>=1.8", "matplotlib>=3.5", "h5py>=3.6"]
 
 [tool.maturin]
 # Mixed Rust/Python layout: pure-Python package lives under python/pipnn,
-# the compiled extension is pipnn._pipnn.
+# the compiled extension is pipnn._pipnn (abi3, so one wheel serves py3.9+).
 python-source = "python"
 module-name = "pipnn._pipnn"
 features = ["pyo3/extension-module"]
