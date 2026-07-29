@@ -28,9 +28,10 @@ from sklearn.utils.validation import check_array
 __all__ = ["GlassTransformer"]
 
 _INSTALL_HINT = (
-    "pyglass ('glass') is not importable. It ships only as manylinux x86_64 "
-    "(`pip install glassppy`, CPython 3.10) or a from-source build "
-    "(https://github.com/zilliztech/pyglass); there is no macOS/arm64 wheel."
+    "pyglass ('glass') is not importable. Install `pip install pyglass-portable` "
+    "for wheels that run on macOS (Apple Silicon + Intel) and non-AVX-512 Linux "
+    "x86_64. The upstream `glassppy` wheel is AVX-512-only; from-source builds are "
+    "at https://github.com/zilliztech/pyglass."
 )
 
 
