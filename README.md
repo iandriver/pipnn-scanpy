@@ -94,20 +94,27 @@ sc.pp.neighbors(adata, n_neighbors=15, transformer=GlassTransformer())
 
 Upstream pyglass publishes only **AVX-512** x86_64 wheels (`glassppy`, CPython
 3.10), which `SIGILL` on CPUs without AVX-512 — Apple Silicon, AMD, older Intel.
-The pyglass *source* is portable (it ships AVX2 / NEON / scalar kernels), so
-[`tools/pyglass-portable`](tools/pyglass-portable) patches the build and compiles
-a wheel for the local CPU:
+The pyglass *source* is portable (it ships AVX2 / NEON / scalar kernels), so the
+simplest path is the portable repackage on PyPI:
+
+```bash
+pip install pyglass-portable   # wheels: macOS arm64 (NEON), Linux x86_64 (AVX2)
+```
+
+It installs as `glass`, runs **natively** on Apple Silicon and non-AVX-512 x86,
+and `GlassTransformer` picks it up automatically (it imports `glass` or
+`glassppy`), so pyglass works in `sc.pp.neighbors` the same way PiPNN does — that
+is how the pyglass column in the Tahoe benchmark above was produced, on an
+Apple-Silicon Mac. Intel-Mac and ARM-Linux users install from its sdist (compiles
+locally); portability fixes are proposed upstream in
+[zilliztech/pyglass#24](https://github.com/zilliztech/pyglass/pull/24).
+
+To build a wheel from source instead — e.g. to match a specific local CPU —
+[`tools/pyglass-portable`](tools/pyglass-portable) patches and compiles it:
 
 ```bash
 PYTHON=python3.12 tools/pyglass-portable/build_wheel.sh   # → an installable `glass` wheel
 ```
-
-This runs **natively** on Apple Silicon (NEON) and AMD / x86 (AVX2). Once it's
-installed, `GlassTransformer` activates automatically (it imports `glass` or
-`glassppy`), so pyglass works in `sc.pp.neighbors` the same way PiPNN does — that
-is how the pyglass column in the Tahoe benchmark above was produced, on an
-Apple-Silicon Mac. `.github/workflows/pyglass-portable-wheels.yml` builds and
-smoke-tests these wheels across linux-x86_64 / macOS-arm64 / macOS-x86_64.
 
 (The older `docker/Dockerfile` still builds a full x86_64 image, but the portable
 wheel makes native runs the simpler path — no Docker or emulation needed.)
