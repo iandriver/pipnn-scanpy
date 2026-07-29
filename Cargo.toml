@@ -1,6 +1,6 @@
 [package]
 name = "pipnn"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "PiPNN: ultra-scalable graph-based nearest neighbor indexing for single-cell data"
 license = "MIT"
