@@ -3,6 +3,7 @@
 
 pub mod build;
 pub mod gemm;
+pub mod fused;
 
 pub use build::{pick_leaf, Edge};
 pub use gemm::leaf_sq_dists;

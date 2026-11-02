@@ -1,0 +1,3088 @@
+{
+  "threads": 4,
+  "nonself_neighbors": 15,
+  "python": "3.12.13 (main, Jun  2 2026, 22:42:28) [Clang 22.1.3 ]",
+  "platform": "macOS-26.5.1-arm64-arm-64bit",
+  "versions": {
+    "numpy": "2.4.6",
+    "scipy": "1.16.3",
+    "scikit-learn": "1.9.0",
+    "scanpy": "1.12.2",
+    "anndata": "0.12.10",
+    "faiss-cpu": "1.14.3",
+    "pynndescent": "0.6.0",
+    "igraph": "1.0.0"
+  },
+  "source_sha256": {
+    "bench/bench_exact_graph.py": "6ed71e9a13fb578c487fc2a408a172a0127e094c4ada177ef70b170deae4fe03",
+    "bench/report_exact_graph.py": "673658eb6a0600a4bebe46f20ed946819c45baa3aefc789051f18b8b1c230a4a",
+    "bench/audit_exact_disagreements.py": "2c0fe813a05815c8eeb317e8e26ff582326017ed63def70f44064074573ce882",
+    "python/pipnn/transformer.py": "f22c4fad002a0d0c46311af2de520929ccaebe6f92fa855f9775903a976628ab"
+  },
+  "extension_sha256": "45bc40a3905c34683e53ebf352edb438de99f84aa34299a42c6d0f57bbd83a31",
+  "scanpy_connectivity_sha256": "8730bbb5fb29c6a70a354947d9e52bd5d2f11b4ad733a418ab7b4b8f61d88719",
+  "results": {
+    "pbmc3k": {
+      "dataset": {
+        "n": 2638,
+        "d": 50,
+        "k": 15,
+        "categories": [
+          "B cells",
+          "CD14+ Monocytes",
+          "CD4 T cells",
+          "CD8 T cells",
+          "Dendritic cells",
+          "FCGR3A+ Monocytes",
+          "Megakaryocytes",
+          "NK cells"
+        ],
+        "counts": [
+          342,
+          480,
+          1144,
+          316,
+          37,
+          150,
+          15,
+          154
+        ],
+        "input_sha256": "347e951559fb651bce50368fe4f123c98e0650c53b4486794a5b51774dc87e4c",
+        "labels_sha256": "1d33343a8e077eaa24c504d1c48fe30eeaa364fe492156846688fe529f95a687",
+        "source": "public scanpy.datasets.pbmc3k_processed",
+        "subset_seed": 20261102,
+        "rare_threshold": 0.01
+      },
+      "search": {
+        "faiss": {
+          "median_seconds": 0.0029575839871540666,
+          "min_seconds": 0.002952834009192884,
+          "max_seconds": 0.0049139580223709345,
+          "median_peak_mb": 68.698112,
+          "graph_stable_across_repeats": true,
+          "recall": 1.0,
+          "by_type": {
+            "B cells": {
+              "cells": 342,
+              "recall": 1.0
+            },
+            "CD14+ Monocytes": {
+              "cells": 480,
+              "recall": 1.0
+            },
+            "CD4 T cells": {
+              "cells": 1144,
+              "recall": 1.0
+            },
+            "CD8 T cells": {
+              "cells": 316,
+              "recall": 1.0
+            },
+            "Dendritic cells": {
+              "cells": 37,
+              "recall": 1.0
+            },
+            "FCGR3A+ Monocytes": {
+              "cells": 150,
+              "recall": 1.0
+            },
+            "Megakaryocytes": {
+              "cells": 15,
+              "recall": 1.0
+            },
+            "NK cells": {
+              "cells": 154,
+              "recall": 1.0
+            }
+          },
+          "rare": {
+            "Megakaryocytes": {
+              "cells": 15,
+              "recall": 1.0
+            }
+          },
+          "records": [
+            {
+              "method": "faiss",
+              "seconds": 0.0029575839871540666,
+              "peak_process_mb": 68.698112,
+              "graph_ids_sha256": "9d80b9d0285a9018524e143cc79e329c261494e77d7b12f0e35bbc43830f2e22",
+              "input_sha256": "347e951559fb651bce50368fe4f123c98e0650c53b4486794a5b51774dc87e4c"
+            },
+            {
+              "method": "faiss",
+              "seconds": 0.002952834009192884,
+              "peak_process_mb": 68.616192,
+              "graph_ids_sha256": "9d80b9d0285a9018524e143cc79e329c261494e77d7b12f0e35bbc43830f2e22",
+              "input_sha256": "347e951559fb651bce50368fe4f123c98e0650c53b4486794a5b51774dc87e4c"
+            },
+            {
+              "method": "faiss",
+              "seconds": 0.0049139580223709345,
+              "peak_process_mb": 70.221824,
+              "graph_ids_sha256": "9d80b9d0285a9018524e143cc79e329c261494e77d7b12f0e35bbc43830f2e22",
+              "input_sha256": "347e951559fb651bce50368fe4f123c98e0650c53b4486794a5b51774dc87e4c"
+            }
+          ]
+        },
+        "sklearn": {
+          "median_seconds": 0.009771249955520034,
+          "min_seconds": 0.00960262503940612,
+          "max_seconds": 0.009857916040346026,
+          "median_peak_mb": 155.959296,
+          "graph_stable_across_repeats": true,
+          "recall": 1.0,
+          "by_type": {
+            "B cells": {
+              "cells": 342,
+              "recall": 1.0
+            },
+            "CD14+ Monocytes": {
+              "cells": 480,
+              "recall": 1.0
+            },
+            "CD4 T cells": {
+              "cells": 1144,
+              "recall": 1.0
+            },
+            "CD8 T cells": {
+              "cells": 316,
+              "recall": 1.0
+            },
+            "Dendritic cells": {
+              "cells": 37,
+              "recall": 1.0
+            },
+            "FCGR3A+ Monocytes": {
+              "cells": 150,
+              "recall": 1.0
+            },
+            "Megakaryocytes": {
+              "cells": 15,
+              "recall": 1.0
+            },
+            "NK cells": {
+              "cells": 154,
+              "recall": 1.0
+            }
+          },
+          "rare": {
+            "Megakaryocytes": {
+              "cells": 15,
+              "recall": 1.0
+            }
+          },
+          "records": [
+            {
+              "method": "sklearn",
+              "seconds": 0.00960262503940612,
+              "peak_process_mb": 155.81184,
+              "graph_ids_sha256": "9d80b9d0285a9018524e143cc79e329c261494e77d7b12f0e35bbc43830f2e22",
+              "input_sha256": "347e951559fb651bce50368fe4f123c98e0650c53b4486794a5b51774dc87e4c"
+            },
+            {
+              "method": "sklearn",
+              "seconds": 0.009771249955520034,
+              "peak_process_mb": 155.959296,
+              "graph_ids_sha256": "9d80b9d0285a9018524e143cc79e329c261494e77d7b12f0e35bbc43830f2e22",
+              "input_sha256": "347e951559fb651bce50368fe4f123c98e0650c53b4486794a5b51774dc87e4c"
+            },
+            {
+              "method": "sklearn",
+              "seconds": 0.009857916040346026,
+              "peak_process_mb": 160.366592,
+              "graph_ids_sha256": "9d80b9d0285a9018524e143cc79e329c261494e77d7b12f0e35bbc43830f2e22",
+              "input_sha256": "347e951559fb651bce50368fe4f123c98e0650c53b4486794a5b51774dc87e4c"
+            }
+          ]
+        },
+        "direct": {
+          "median_seconds": 0.03968091693241149,
+          "min_seconds": 0.03641299996525049,
+          "max_seconds": 0.04202833294402808,
+          "median_peak_mb": 165.789696,
+          "graph_stable_across_repeats": true,
+          "recall": 0.9998230983067983,
+          "by_type": {
+            "B cells": {
+              "cells": 342,
+              "recall": 0.9994152046783626
+            },
+            "CD14+ Monocytes": {
+              "cells": 480,
+              "recall": 1.0
+            },
+            "CD4 T cells": {
+              "cells": 1144,
+              "recall": 0.999941724941725
+            },
+            "CD8 T cells": {
+              "cells": 316,
+              "recall": 0.99957805907173
+            },
+            "Dendritic cells": {
+              "cells": 37,
+              "recall": 1.0
+            },
+            "FCGR3A+ Monocytes": {
+              "cells": 150,
+              "recall": 0.9995555555555555
+            },
+            "Megakaryocytes": {
+              "cells": 15,
+              "recall": 1.0
+            },
+            "NK cells": {
+              "cells": 154,
+              "recall": 1.0
+            }
+          },
+          "rare": {
+            "Megakaryocytes": {
+              "cells": 15,
+              "recall": 1.0
+            }
+          },
+          "records": [
+            {
+              "method": "direct",
+              "seconds": 0.03641299996525049,
+              "peak_process_mb": 164.069376,
+              "graph_ids_sha256": "02d077b05a200f2245fbfffe4b374f617c79fb869f7c126fe17bdc2a4976831a",
+              "input_sha256": "347e951559fb651bce50368fe4f123c98e0650c53b4486794a5b51774dc87e4c"
+            },
+            {
+              "method": "direct",
+              "seconds": 0.03968091693241149,
+              "peak_process_mb": 165.789696,
+              "graph_ids_sha256": "02d077b05a200f2245fbfffe4b374f617c79fb869f7c126fe17bdc2a4976831a",
+              "input_sha256": "347e951559fb651bce50368fe4f123c98e0650c53b4486794a5b51774dc87e4c"
+            },
+            {
+              "method": "direct",
+              "seconds": 0.04202833294402808,
+              "peak_process_mb": 166.346752,
+              "graph_ids_sha256": "02d077b05a200f2245fbfffe4b374f617c79fb869f7c126fe17bdc2a4976831a",
+              "input_sha256": "347e951559fb651bce50368fe4f123c98e0650c53b4486794a5b51774dc87e4c"
+            }
+          ]
+        },
+        "index": {
+          "median_seconds": 0.0450966659700498,
+          "min_seconds": 0.04367058305069804,
+          "max_seconds": 0.04521087498869747,
+          "median_peak_mb": 197.410816,
+          "graph_stable_across_repeats": true,
+          "recall": 0.999873641647713,
+          "by_type": {
+            "B cells": {
+              "cells": 342,
+              "recall": 1.0
+            },
+            "CD14+ Monocytes": {
+              "cells": 480,
+              "recall": 1.0
+            },
+            "CD4 T cells": {
+              "cells": 1144,
+              "recall": 0.99988344988345
+            },
+            "CD8 T cells": {
+              "cells": 316,
+              "recall": 0.99957805907173
+            },
+            "Dendritic cells": {
+              "cells": 37,
+              "recall": 1.0
+            },
+            "FCGR3A+ Monocytes": {
+              "cells": 150,
+              "recall": 1.0
+            },
+            "Megakaryocytes": {
+              "cells": 15,
+              "recall": 1.0
+            },
+            "NK cells": {
+              "cells": 154,
+              "recall": 0.9995670995670995
+            }
+          },
+          "rare": {
+            "Megakaryocytes": {
+              "cells": 15,
+              "recall": 1.0
+            }
+          },
+          "records": [
+            {
+              "method": "index",
+              "seconds": 0.04521087498869747,
+              "peak_process_mb": 197.50912,
+              "graph_ids_sha256": "d4c47c5fccf6ef001c83720621eb050fd850cdee3874c21d57d5176a331b0cb4",
+              "input_sha256": "347e951559fb651bce50368fe4f123c98e0650c53b4486794a5b51774dc87e4c"
+            },
+            {
+              "method": "index",
+              "seconds": 0.04367058305069804,
+              "peak_process_mb": 197.410816,
+              "graph_ids_sha256": "d4c47c5fccf6ef001c83720621eb050fd850cdee3874c21d57d5176a331b0cb4",
+              "input_sha256": "347e951559fb651bce50368fe4f123c98e0650c53b4486794a5b51774dc87e4c"
+            },
+            {
+              "method": "index",
+              "seconds": 0.0450966659700498,
+              "peak_process_mb": 197.361664,
+              "graph_ids_sha256": "d4c47c5fccf6ef001c83720621eb050fd850cdee3874c21d57d5176a331b0cb4",
+              "input_sha256": "347e951559fb651bce50368fe4f123c98e0650c53b4486794a5b51774dc87e4c"
+            }
+          ]
+        },
+        "scanpy_pynn": {
+          "median_seconds": 0.4594919580267742,
+          "min_seconds": 0.4383166660554707,
+          "max_seconds": 0.46008695801720023,
+          "median_peak_mb": 628.932608,
+          "graph_stable_across_repeats": true,
+          "recall": 0.9706343189284812,
+          "by_type": {
+            "B cells": {
+              "cells": 342,
+              "recall": 0.9847953216374269
+            },
+            "CD14+ Monocytes": {
+              "cells": 480,
+              "recall": 0.98625
+            },
+            "CD4 T cells": {
+              "cells": 1144,
+              "recall": 0.9571678321678322
+            },
+            "CD8 T cells": {
+              "cells": 316,
+              "recall": 0.9626582278481014
+            },
+            "Dendritic cells": {
+              "cells": 37,
+              "recall": 0.9855855855855854
+            },
+            "FCGR3A+ Monocytes": {
+              "cells": 150,
+              "recall": 0.9844444444444446
+            },
+            "Megakaryocytes": {
+              "cells": 15,
+              "recall": 0.968888888888889
+            },
+            "NK cells": {
+              "cells": 154,
+              "recall": 0.9900432900432903
+            }
+          },
+          "rare": {
+            "Megakaryocytes": {
+              "cells": 15,
+              "recall": 0.968888888888889
+            }
+          },
+          "records": [
+            {
+              "method": "scanpy_pynn",
+              "seconds": 0.46008695801720023,
+              "peak_process_mb": 630.3744,
+              "graph_ids_sha256": "7bf0fc26dcc9806c433dbfd74bec90b727061733a2143107b2f60ca97d94197a",
+              "input_sha256": "347e951559fb651bce50368fe4f123c98e0650c53b4486794a5b51774dc87e4c"
+            },
+            {
+              "method": "scanpy_pynn",
+              "seconds": 0.4594919580267742,
+              "peak_process_mb": 591.4624,
+              "graph_ids_sha256": "7bf0fc26dcc9806c433dbfd74bec90b727061733a2143107b2f60ca97d94197a",
+              "input_sha256": "347e951559fb651bce50368fe4f123c98e0650c53b4486794a5b51774dc87e4c"
+            },
+            {
+              "method": "scanpy_pynn",
+              "seconds": 0.4383166660554707,
+              "peak_process_mb": 628.932608,
+              "graph_ids_sha256": "7bf0fc26dcc9806c433dbfd74bec90b727061733a2143107b2f60ca97d94197a",
+              "input_sha256": "347e951559fb651bce50368fe4f123c98e0650c53b4486794a5b51774dc87e4c"
+            }
+          ]
+        },
+        "pynndescent": {
+          "median_seconds": 0.04152112500742078,
+          "min_seconds": 0.03995674999896437,
+          "max_seconds": 0.04186666710302234,
+          "median_peak_mb": 459.40736,
+          "graph_stable_across_repeats": true,
+          "recall": 0.9616123325751833,
+          "by_type": {
+            "B cells": {
+              "cells": 342,
+              "recall": 0.9824561403508771
+            },
+            "CD14+ Monocytes": {
+              "cells": 480,
+              "recall": 0.9805555555555557
+            },
+            "CD4 T cells": {
+              "cells": 1144,
+              "recall": 0.9415501165501164
+            },
+            "CD8 T cells": {
+              "cells": 316,
+              "recall": 0.9544303797468355
+            },
+            "Dendritic cells": {
+              "cells": 37,
+              "recall": 0.9765765765765766
+            },
+            "FCGR3A+ Monocytes": {
+              "cells": 150,
+              "recall": 0.9888888888888889
+            },
+            "Megakaryocytes": {
+              "cells": 15,
+              "recall": 0.9911111111111112
+            },
+            "NK cells": {
+              "cells": 154,
+              "recall": 0.987012987012987
+            }
+          },
+          "rare": {
+            "Megakaryocytes": {
+              "cells": 15,
+              "recall": 0.9911111111111112
+            }
+          },
+          "records": [
+            {
+              "method": "pynndescent",
+              "seconds": 0.03995674999896437,
+              "peak_process_mb": 458.735616,
+              "graph_ids_sha256": "13ca4555d64bb5500e4200f4b578779156574dd3f978d3768c7fc15bb4532f09",
+              "input_sha256": "347e951559fb651bce50368fe4f123c98e0650c53b4486794a5b51774dc87e4c"
+            },
+            {
+              "method": "pynndescent",
+              "seconds": 0.04152112500742078,
+              "peak_process_mb": 461.832192,
+              "graph_ids_sha256": "13ca4555d64bb5500e4200f4b578779156574dd3f978d3768c7fc15bb4532f09",
+              "input_sha256": "347e951559fb651bce50368fe4f123c98e0650c53b4486794a5b51774dc87e4c"
+            },
+            {
+              "method": "pynndescent",
+              "seconds": 0.04186666710302234,
+              "peak_process_mb": 459.40736,
+              "graph_ids_sha256": "13ca4555d64bb5500e4200f4b578779156574dd3f978d3768c7fc15bb4532f09",
+              "input_sha256": "347e951559fb651bce50368fe4f123c98e0650c53b4486794a5b51774dc87e4c"
+            }
+          ]
+        }
+      },
+      "downstream": {
+        "reference": "sklearn",
+        "recall": {
+          "faiss": {
+            "overall": 1.0,
+            "by_type": {
+              "B cells": {
+                "cells": 342,
+                "recall": 1.0
+              },
+              "CD14+ Monocytes": {
+                "cells": 480,
+                "recall": 1.0
+              },
+              "CD4 T cells": {
+                "cells": 1144,
+                "recall": 1.0
+              },
+              "CD8 T cells": {
+                "cells": 316,
+                "recall": 1.0
+              },
+              "Dendritic cells": {
+                "cells": 37,
+                "recall": 1.0
+              },
+              "FCGR3A+ Monocytes": {
+                "cells": 150,
+                "recall": 1.0
+              },
+              "Megakaryocytes": {
+                "cells": 15,
+                "recall": 1.0
+              },
+              "NK cells": {
+                "cells": 154,
+                "recall": 1.0
+              }
+            }
+          },
+          "sklearn": {
+            "overall": 1.0,
+            "by_type": {
+              "B cells": {
+                "cells": 342,
+                "recall": 1.0
+              },
+              "CD14+ Monocytes": {
+                "cells": 480,
+                "recall": 1.0
+              },
+              "CD4 T cells": {
+                "cells": 1144,
+                "recall": 1.0
+              },
+              "CD8 T cells": {
+                "cells": 316,
+                "recall": 1.0
+              },
+              "Dendritic cells": {
+                "cells": 37,
+                "recall": 1.0
+              },
+              "FCGR3A+ Monocytes": {
+                "cells": 150,
+                "recall": 1.0
+              },
+              "Megakaryocytes": {
+                "cells": 15,
+                "recall": 1.0
+              },
+              "NK cells": {
+                "cells": 154,
+                "recall": 1.0
+              }
+            }
+          },
+          "direct": {
+            "overall": 0.9998230983067983,
+            "by_type": {
+              "B cells": {
+                "cells": 342,
+                "recall": 0.9994152046783626
+              },
+              "CD14+ Monocytes": {
+                "cells": 480,
+                "recall": 1.0
+              },
+              "CD4 T cells": {
+                "cells": 1144,
+                "recall": 0.999941724941725
+              },
+              "CD8 T cells": {
+                "cells": 316,
+                "recall": 0.99957805907173
+              },
+              "Dendritic cells": {
+                "cells": 37,
+                "recall": 1.0
+              },
+              "FCGR3A+ Monocytes": {
+                "cells": 150,
+                "recall": 0.9995555555555555
+              },
+              "Megakaryocytes": {
+                "cells": 15,
+                "recall": 1.0
+              },
+              "NK cells": {
+                "cells": 154,
+                "recall": 1.0
+              }
+            }
+          },
+          "index": {
+            "overall": 0.999873641647713,
+            "by_type": {
+              "B cells": {
+                "cells": 342,
+                "recall": 1.0
+              },
+              "CD14+ Monocytes": {
+                "cells": 480,
+                "recall": 1.0
+              },
+              "CD4 T cells": {
+                "cells": 1144,
+                "recall": 0.99988344988345
+              },
+              "CD8 T cells": {
+                "cells": 316,
+                "recall": 0.99957805907173
+              },
+              "Dendritic cells": {
+                "cells": 37,
+                "recall": 1.0
+              },
+              "FCGR3A+ Monocytes": {
+                "cells": 150,
+                "recall": 1.0
+              },
+              "Megakaryocytes": {
+                "cells": 15,
+                "recall": 1.0
+              },
+              "NK cells": {
+                "cells": 154,
+                "recall": 0.9995670995670995
+              }
+            }
+          },
+          "scanpy_pynn": {
+            "overall": 0.9706343189284812,
+            "by_type": {
+              "B cells": {
+                "cells": 342,
+                "recall": 0.9847953216374269
+              },
+              "CD14+ Monocytes": {
+                "cells": 480,
+                "recall": 0.98625
+              },
+              "CD4 T cells": {
+                "cells": 1144,
+                "recall": 0.9571678321678322
+              },
+              "CD8 T cells": {
+                "cells": 316,
+                "recall": 0.9626582278481014
+              },
+              "Dendritic cells": {
+                "cells": 37,
+                "recall": 0.9855855855855854
+              },
+              "FCGR3A+ Monocytes": {
+                "cells": 150,
+                "recall": 0.9844444444444446
+              },
+              "Megakaryocytes": {
+                "cells": 15,
+                "recall": 0.968888888888889
+              },
+              "NK cells": {
+                "cells": 154,
+                "recall": 0.9900432900432903
+              }
+            }
+          },
+          "pynndescent": {
+            "overall": 0.9616123325751833,
+            "by_type": {
+              "B cells": {
+                "cells": 342,
+                "recall": 0.9824561403508771
+              },
+              "CD14+ Monocytes": {
+                "cells": 480,
+                "recall": 0.9805555555555557
+              },
+              "CD4 T cells": {
+                "cells": 1144,
+                "recall": 0.9415501165501164
+              },
+              "CD8 T cells": {
+                "cells": 316,
+                "recall": 0.9544303797468355
+              },
+              "Dendritic cells": {
+                "cells": 37,
+                "recall": 0.9765765765765766
+              },
+              "FCGR3A+ Monocytes": {
+                "cells": 150,
+                "recall": 0.9888888888888889
+              },
+              "Megakaryocytes": {
+                "cells": 15,
+                "recall": 0.9911111111111112
+              },
+              "NK cells": {
+                "cells": 154,
+                "recall": 0.987012987012987
+              }
+            }
+          }
+        },
+        "checks": {
+          "sklearn_umap": {
+            "weight_seconds": 0.012174249975942075,
+            "three_seed_cluster_seconds": 0.08250054100062698,
+            "graph": {
+              "edges_undirected": 34843,
+              "components": 1,
+              "largest_component_fraction": 1.0,
+              "isolated_cells": 0,
+              "by_type": {
+                "B cells": {
+                  "cells": 342,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.011919319517970983
+                },
+                "CD14+ Monocytes": {
+                  "cells": 480,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.049458691898140894
+                },
+                "CD4 T cells": {
+                  "cells": 1144,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.05736292261537479
+                },
+                "CD8 T cells": {
+                  "cells": 316,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.24225746989496677
+                },
+                "Dendritic cells": {
+                  "cells": 37,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.1644296344772762
+                },
+                "FCGR3A+ Monocytes": {
+                  "cells": 150,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.15375950119566806
+                },
+                "Megakaryocytes": {
+                  "cells": 15,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.12038209300283476
+                },
+                "NK cells": {
+                  "cells": 154,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.1009977581787237
+                }
+              }
+            },
+            "clustering": {
+              "seeds": [
+                {
+                  "seed": 0,
+                  "clusters": 8,
+                  "ari_to_annotations": 0.948398823402499,
+                  "nmi_to_annotations": 0.9260091046627079,
+                  "ari_to_exact_same_seed": 1.0,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 1
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.9854166666666667,
+                      "best_cluster_purity": 0.9813278008298755,
+                      "occupied_clusters": 3
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9807692307692307,
+                      "best_cluster_purity": 0.9859402460456942,
+                      "occupied_clusters": 4
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.9113924050632911,
+                      "best_cluster_purity": 0.9320388349514563,
+                      "occupied_clusters": 3
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.8918918918918919,
+                      "best_cluster_purity": 0.9705882352941176,
+                      "occupied_clusters": 2
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.9733333333333334,
+                      "best_cluster_purity": 0.9419354838709677,
+                      "occupied_clusters": 2
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.8666666666666667,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 3
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.9935064935064936,
+                      "best_cluster_purity": 0.9272727272727272,
+                      "occupied_clusters": 2
+                    }
+                  }
+                },
+                {
+                  "seed": 1,
+                  "clusters": 8,
+                  "ari_to_annotations": 0.9401888798908926,
+                  "nmi_to_annotations": 0.9196579614493853,
+                  "ari_to_exact_same_seed": 1.0,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 1
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.9854166666666667,
+                      "best_cluster_purity": 0.9813278008298755,
+                      "occupied_clusters": 3
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9772727272727273,
+                      "best_cluster_purity": 0.9824253075571178,
+                      "occupied_clusters": 4
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.8987341772151899,
+                      "best_cluster_purity": 0.919093851132686,
+                      "occupied_clusters": 3
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.8918918918918919,
+                      "best_cluster_purity": 0.9705882352941176,
+                      "occupied_clusters": 2
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.9733333333333334,
+                      "best_cluster_purity": 0.9419354838709677,
+                      "occupied_clusters": 2
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.8666666666666667,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 3
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.9935064935064936,
+                      "best_cluster_purity": 0.9272727272727272,
+                      "occupied_clusters": 2
+                    }
+                  }
+                },
+                {
+                  "seed": 2,
+                  "clusters": 8,
+                  "ari_to_annotations": 0.9421947457050054,
+                  "nmi_to_annotations": 0.9212629694730946,
+                  "ari_to_exact_same_seed": 1.0,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 1
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.9854166666666667,
+                      "best_cluster_purity": 0.9813278008298755,
+                      "occupied_clusters": 3
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9772727272727273,
+                      "best_cluster_purity": 0.9841549295774648,
+                      "occupied_clusters": 4
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.9050632911392406,
+                      "best_cluster_purity": 0.9196141479099679,
+                      "occupied_clusters": 3
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.8918918918918919,
+                      "best_cluster_purity": 0.9705882352941176,
+                      "occupied_clusters": 2
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.9733333333333334,
+                      "best_cluster_purity": 0.9419354838709677,
+                      "occupied_clusters": 2
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.8666666666666667,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 3
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.9935064935064936,
+                      "best_cluster_purity": 0.9272727272727272,
+                      "occupied_clusters": 2
+                    }
+                  }
+                }
+              ],
+              "within_graph_seed_ari": [
+                0.9827756588169921,
+                0.9913344489207971,
+                0.9913344489207971
+              ]
+            }
+          },
+          "faiss_umap": {
+            "weight_seconds": 0.0066995000233873725,
+            "three_seed_cluster_seconds": 0.0830683340318501,
+            "graph": {
+              "edges_undirected": 34843,
+              "components": 1,
+              "largest_component_fraction": 1.0,
+              "isolated_cells": 0,
+              "by_type": {
+                "B cells": {
+                  "cells": 342,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.011919319517970983
+                },
+                "CD14+ Monocytes": {
+                  "cells": 480,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.049458691898140894
+                },
+                "CD4 T cells": {
+                  "cells": 1144,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.05736292261537479
+                },
+                "CD8 T cells": {
+                  "cells": 316,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.24225746989496677
+                },
+                "Dendritic cells": {
+                  "cells": 37,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.1644296344772762
+                },
+                "FCGR3A+ Monocytes": {
+                  "cells": 150,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.15375950119566806
+                },
+                "Megakaryocytes": {
+                  "cells": 15,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.12038209300283476
+                },
+                "NK cells": {
+                  "cells": 154,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.1009977581787237
+                }
+              }
+            },
+            "difference_to_exact": {
+              "edge_jaccard": 1.0,
+              "relative_weight_l1": 0.0,
+              "by_type_relative_weight_l1": {
+                "B cells": 0.0,
+                "CD14+ Monocytes": 0.0,
+                "CD4 T cells": 0.0,
+                "CD8 T cells": 0.0,
+                "Dendritic cells": 0.0,
+                "FCGR3A+ Monocytes": 0.0,
+                "Megakaryocytes": 0.0,
+                "NK cells": 0.0
+              }
+            },
+            "clustering": {
+              "seeds": [
+                {
+                  "seed": 0,
+                  "clusters": 8,
+                  "ari_to_annotations": 0.948398823402499,
+                  "nmi_to_annotations": 0.9260091046627079,
+                  "ari_to_exact_same_seed": 1.0,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 1
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.9854166666666667,
+                      "best_cluster_purity": 0.9813278008298755,
+                      "occupied_clusters": 3
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9807692307692307,
+                      "best_cluster_purity": 0.9859402460456942,
+                      "occupied_clusters": 4
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.9113924050632911,
+                      "best_cluster_purity": 0.9320388349514563,
+                      "occupied_clusters": 3
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.8918918918918919,
+                      "best_cluster_purity": 0.9705882352941176,
+                      "occupied_clusters": 2
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.9733333333333334,
+                      "best_cluster_purity": 0.9419354838709677,
+                      "occupied_clusters": 2
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.8666666666666667,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 3
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.9935064935064936,
+                      "best_cluster_purity": 0.9272727272727272,
+                      "occupied_clusters": 2
+                    }
+                  }
+                },
+                {
+                  "seed": 1,
+                  "clusters": 8,
+                  "ari_to_annotations": 0.9401888798908926,
+                  "nmi_to_annotations": 0.9196579614493853,
+                  "ari_to_exact_same_seed": 1.0,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 1
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.9854166666666667,
+                      "best_cluster_purity": 0.9813278008298755,
+                      "occupied_clusters": 3
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9772727272727273,
+                      "best_cluster_purity": 0.9824253075571178,
+                      "occupied_clusters": 4
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.8987341772151899,
+                      "best_cluster_purity": 0.919093851132686,
+                      "occupied_clusters": 3
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.8918918918918919,
+                      "best_cluster_purity": 0.9705882352941176,
+                      "occupied_clusters": 2
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.9733333333333334,
+                      "best_cluster_purity": 0.9419354838709677,
+                      "occupied_clusters": 2
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.8666666666666667,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 3
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.9935064935064936,
+                      "best_cluster_purity": 0.9272727272727272,
+                      "occupied_clusters": 2
+                    }
+                  }
+                },
+                {
+                  "seed": 2,
+                  "clusters": 8,
+                  "ari_to_annotations": 0.9421947457050054,
+                  "nmi_to_annotations": 0.9212629694730946,
+                  "ari_to_exact_same_seed": 1.0,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 1
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.9854166666666667,
+                      "best_cluster_purity": 0.9813278008298755,
+                      "occupied_clusters": 3
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9772727272727273,
+                      "best_cluster_purity": 0.9841549295774648,
+                      "occupied_clusters": 4
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.9050632911392406,
+                      "best_cluster_purity": 0.9196141479099679,
+                      "occupied_clusters": 3
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.8918918918918919,
+                      "best_cluster_purity": 0.9705882352941176,
+                      "occupied_clusters": 2
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.9733333333333334,
+                      "best_cluster_purity": 0.9419354838709677,
+                      "occupied_clusters": 2
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.8666666666666667,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 3
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.9935064935064936,
+                      "best_cluster_purity": 0.9272727272727272,
+                      "occupied_clusters": 2
+                    }
+                  }
+                }
+              ],
+              "within_graph_seed_ari": [
+                0.9827756588169921,
+                0.9913344489207971,
+                0.9913344489207971
+              ]
+            }
+          },
+          "direct_umap": {
+            "weight_seconds": 0.006340084015391767,
+            "three_seed_cluster_seconds": 0.08375137497205287,
+            "graph": {
+              "edges_undirected": 34843,
+              "components": 1,
+              "largest_component_fraction": 1.0,
+              "isolated_cells": 0,
+              "by_type": {
+                "B cells": {
+                  "cells": 342,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.011812943260310127
+                },
+                "CD14+ Monocytes": {
+                  "cells": 480,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.04946698389597781
+                },
+                "CD4 T cells": {
+                  "cells": 1144,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.05727827162495902
+                },
+                "CD8 T cells": {
+                  "cells": 316,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.24177409911549275
+                },
+                "Dendritic cells": {
+                  "cells": 37,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.1639227725510306
+                },
+                "FCGR3A+ Monocytes": {
+                  "cells": 150,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.1534300975366678
+                },
+                "Megakaryocytes": {
+                  "cells": 15,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.12038209300283476
+                },
+                "NK cells": {
+                  "cells": 154,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.10105330451459704
+                }
+              }
+            },
+            "difference_to_exact": {
+              "edge_jaccard": 0.9996556572641969,
+              "relative_weight_l1": 0.0003365650190971792,
+              "by_type_relative_weight_l1": {
+                "B cells": 0.00043914356501773,
+                "CD14+ Monocytes": 8.697397788637318e-06,
+                "CD4 T cells": 0.00018887333862949163,
+                "CD8 T cells": 0.0012671254808083177,
+                "Dendritic cells": 0.0006062694592401385,
+                "FCGR3A+ Monocytes": 0.0006655921461060643,
+                "Megakaryocytes": 0.0,
+                "NK cells": 6.187285907799378e-05
+              }
+            },
+            "clustering": {
+              "seeds": [
+                {
+                  "seed": 0,
+                  "clusters": 8,
+                  "ari_to_annotations": 0.9473846345763266,
+                  "nmi_to_annotations": 0.9251712284343074,
+                  "ari_to_exact_same_seed": 0.9989125240064183,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 1
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.9854166666666667,
+                      "best_cluster_purity": 0.9813278008298755,
+                      "occupied_clusters": 3
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9807692307692307,
+                      "best_cluster_purity": 0.9850746268656716,
+                      "occupied_clusters": 4
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.9082278481012658,
+                      "best_cluster_purity": 0.9318181818181818,
+                      "occupied_clusters": 3
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.8918918918918919,
+                      "best_cluster_purity": 0.9705882352941176,
+                      "occupied_clusters": 2
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.9733333333333334,
+                      "best_cluster_purity": 0.9419354838709677,
+                      "occupied_clusters": 2
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.8666666666666667,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 3
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.9935064935064936,
+                      "best_cluster_purity": 0.9272727272727272,
+                      "occupied_clusters": 2
+                    }
+                  }
+                },
+                {
+                  "seed": 1,
+                  "clusters": 8,
+                  "ari_to_annotations": 0.942119891391033,
+                  "nmi_to_annotations": 0.9214392816939359,
+                  "ari_to_exact_same_seed": 0.9870222315645368,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 1
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.9854166666666667,
+                      "best_cluster_purity": 0.9813278008298755,
+                      "occupied_clusters": 3
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9755244755244755,
+                      "best_cluster_purity": 0.9858657243816255,
+                      "occupied_clusters": 4
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.9113924050632911,
+                      "best_cluster_purity": 0.9142857142857143,
+                      "occupied_clusters": 3
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.8918918918918919,
+                      "best_cluster_purity": 0.9705882352941176,
+                      "occupied_clusters": 2
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.9733333333333334,
+                      "best_cluster_purity": 0.9419354838709677,
+                      "occupied_clusters": 2
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.8666666666666667,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 3
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.9935064935064936,
+                      "best_cluster_purity": 0.9272727272727272,
+                      "occupied_clusters": 2
+                    }
+                  }
+                },
+                {
+                  "seed": 2,
+                  "clusters": 8,
+                  "ari_to_annotations": 0.9421947457050054,
+                  "nmi_to_annotations": 0.9212629694730946,
+                  "ari_to_exact_same_seed": 1.0,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 1
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.9854166666666667,
+                      "best_cluster_purity": 0.9813278008298755,
+                      "occupied_clusters": 3
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9772727272727273,
+                      "best_cluster_purity": 0.9841549295774648,
+                      "occupied_clusters": 4
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.9050632911392406,
+                      "best_cluster_purity": 0.9196141479099679,
+                      "occupied_clusters": 3
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.8918918918918919,
+                      "best_cluster_purity": 0.9705882352941176,
+                      "occupied_clusters": 2
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.9733333333333334,
+                      "best_cluster_purity": 0.9419354838709677,
+                      "occupied_clusters": 2
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.8666666666666667,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 3
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.9935064935064936,
+                      "best_cluster_purity": 0.9272727272727272,
+                      "occupied_clusters": 2
+                    }
+                  }
+                }
+              ],
+              "within_graph_seed_ari": [
+                0.988099057077964,
+                0.9924146786771556,
+                0.9956473112712496
+              ]
+            }
+          },
+          "index_umap": {
+            "weight_seconds": 0.006125084008090198,
+            "three_seed_cluster_seconds": 0.08277433400508016,
+            "graph": {
+              "edges_undirected": 34842,
+              "components": 1,
+              "largest_component_fraction": 1.0,
+              "isolated_cells": 0,
+              "by_type": {
+                "B cells": {
+                  "cells": 342,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.011919319517970983
+                },
+                "CD14+ Monocytes": {
+                  "cells": 480,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.049458691898140894
+                },
+                "CD4 T cells": {
+                  "cells": 1144,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.057333704238260674
+                },
+                "CD8 T cells": {
+                  "cells": 316,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.24220818718117743
+                },
+                "Dendritic cells": {
+                  "cells": 37,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.1644296344772762
+                },
+                "FCGR3A+ Monocytes": {
+                  "cells": 150,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.15375950119566806
+                },
+                "Megakaryocytes": {
+                  "cells": 15,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.12038209300283476
+                },
+                "NK cells": {
+                  "cells": 154,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.1009620707827742
+                }
+              }
+            },
+            "difference_to_exact": {
+              "edge_jaccard": 0.9997417281258071,
+              "relative_weight_l1": 0.0001243387087015435,
+              "by_type_relative_weight_l1": {
+                "B cells": 0.0,
+                "CD14+ Monocytes": 0.0,
+                "CD4 T cells": 0.00014664985064882785,
+                "CD8 T cells": 0.00038223687442950904,
+                "Dendritic cells": 0.0,
+                "FCGR3A+ Monocytes": 0.0,
+                "Megakaryocytes": 0.0,
+                "NK cells": 0.0002656941651366651
+              }
+            },
+            "clustering": {
+              "seeds": [
+                {
+                  "seed": 0,
+                  "clusters": 8,
+                  "ari_to_annotations": 0.9473846345763266,
+                  "nmi_to_annotations": 0.9251712284343074,
+                  "ari_to_exact_same_seed": 0.9989125240064183,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 1
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.9854166666666667,
+                      "best_cluster_purity": 0.9813278008298755,
+                      "occupied_clusters": 3
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9807692307692307,
+                      "best_cluster_purity": 0.9850746268656716,
+                      "occupied_clusters": 4
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.9082278481012658,
+                      "best_cluster_purity": 0.9318181818181818,
+                      "occupied_clusters": 3
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.8918918918918919,
+                      "best_cluster_purity": 0.9705882352941176,
+                      "occupied_clusters": 2
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.9733333333333334,
+                      "best_cluster_purity": 0.9419354838709677,
+                      "occupied_clusters": 2
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.8666666666666667,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 3
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.9935064935064936,
+                      "best_cluster_purity": 0.9272727272727272,
+                      "occupied_clusters": 2
+                    }
+                  }
+                },
+                {
+                  "seed": 1,
+                  "clusters": 8,
+                  "ari_to_annotations": 0.9306527068222508,
+                  "nmi_to_annotations": 0.9140917391332232,
+                  "ari_to_exact_same_seed": 0.9794736117052232,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 1
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.9854166666666667,
+                      "best_cluster_purity": 0.9813278008298755,
+                      "occupied_clusters": 3
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.965034965034965,
+                      "best_cluster_purity": 0.9865951742627346,
+                      "occupied_clusters": 4
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.9145569620253164,
+                      "best_cluster_purity": 0.8810975609756098,
+                      "occupied_clusters": 3
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.8918918918918919,
+                      "best_cluster_purity": 0.9705882352941176,
+                      "occupied_clusters": 2
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.9733333333333334,
+                      "best_cluster_purity": 0.9419354838709677,
+                      "occupied_clusters": 2
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.8666666666666667,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 3
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.9935064935064936,
+                      "best_cluster_purity": 0.9272727272727272,
+                      "occupied_clusters": 2
+                    }
+                  }
+                },
+                {
+                  "seed": 2,
+                  "clusters": 8,
+                  "ari_to_annotations": 0.9421947457050054,
+                  "nmi_to_annotations": 0.9212629694730946,
+                  "ari_to_exact_same_seed": 1.0,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 1
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.9854166666666667,
+                      "best_cluster_purity": 0.9813278008298755,
+                      "occupied_clusters": 3
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9772727272727273,
+                      "best_cluster_purity": 0.9841549295774648,
+                      "occupied_clusters": 4
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.9050632911392406,
+                      "best_cluster_purity": 0.9196141479099679,
+                      "occupied_clusters": 3
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.8918918918918919,
+                      "best_cluster_purity": 0.9705882352941176,
+                      "occupied_clusters": 2
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.9733333333333334,
+                      "best_cluster_purity": 0.9419354838709677,
+                      "occupied_clusters": 2
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.8666666666666667,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 3
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.9935064935064936,
+                      "best_cluster_purity": 0.9272727272727272,
+                      "occupied_clusters": 2
+                    }
+                  }
+                }
+              ],
+              "within_graph_seed_ari": [
+                0.9720576206881177,
+                0.9924146786771556,
+                0.9794609080912416
+              ]
+            }
+          },
+          "scanpy_pynn_umap": {
+            "weight_seconds": 0.006173416972160339,
+            "three_seed_cluster_seconds": 0.08321083406917751,
+            "graph": {
+              "edges_undirected": 34850,
+              "components": 1,
+              "largest_component_fraction": 1.0,
+              "isolated_cells": 0,
+              "by_type": {
+                "B cells": {
+                  "cells": 342,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.010327822864426683
+                },
+                "CD14+ Monocytes": {
+                  "cells": 480,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.04866266159165922
+                },
+                "CD4 T cells": {
+                  "cells": 1144,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.055867141801904885
+                },
+                "CD8 T cells": {
+                  "cells": 316,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.2376858515194904
+                },
+                "Dendritic cells": {
+                  "cells": 37,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.16416071125300358
+                },
+                "FCGR3A+ Monocytes": {
+                  "cells": 150,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.1498935094817485
+                },
+                "Megakaryocytes": {
+                  "cells": 15,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.12033588828742448
+                },
+                "NK cells": {
+                  "cells": 154,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.09946803677977789
+                }
+              }
+            },
+            "difference_to_exact": {
+              "edge_jaccard": 0.9380700778642936,
+              "relative_weight_l1": 0.045028869062662125,
+              "by_type_relative_weight_l1": {
+                "B cells": 0.02231709659099579,
+                "CD14+ Monocytes": 0.019492601975798607,
+                "CD4 T cells": 0.06884819269180298,
+                "CD8 T cells": 0.05198904871940613,
+                "Dendritic cells": 0.010817443951964378,
+                "FCGR3A+ Monocytes": 0.02254764921963215,
+                "Megakaryocytes": 0.019954413175582886,
+                "NK cells": 0.00907446350902319
+              }
+            },
+            "clustering": {
+              "seeds": [
+                {
+                  "seed": 0,
+                  "clusters": 8,
+                  "ari_to_annotations": 0.92776880532565,
+                  "nmi_to_annotations": 0.9055407955490372,
+                  "ari_to_exact_same_seed": 0.9734296599958286,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 1
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.9708333333333333,
+                      "best_cluster_purity": 0.9831223628691983,
+                      "occupied_clusters": 3
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9694055944055944,
+                      "best_cluster_purity": 0.9814159292035398,
+                      "occupied_clusters": 4
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.8955696202531646,
+                      "best_cluster_purity": 0.9188311688311688,
+                      "occupied_clusters": 3
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.8918918918918919,
+                      "best_cluster_purity": 0.9705882352941176,
+                      "occupied_clusters": 2
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.98,
+                      "best_cluster_purity": 0.8546511627906976,
+                      "occupied_clusters": 2
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.8666666666666667,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 3
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.9935064935064936,
+                      "best_cluster_purity": 0.9272727272727272,
+                      "occupied_clusters": 2
+                    }
+                  }
+                },
+                {
+                  "seed": 1,
+                  "clusters": 8,
+                  "ari_to_annotations": 0.9238948212987226,
+                  "nmi_to_annotations": 0.9063219555610486,
+                  "ari_to_exact_same_seed": 0.9714737935522414,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 1
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.975,
+                      "best_cluster_purity": 0.9831932773109243,
+                      "occupied_clusters": 3
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9632867132867133,
+                      "best_cluster_purity": 0.9839285714285714,
+                      "occupied_clusters": 4
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.9050632911392406,
+                      "best_cluster_purity": 0.88,
+                      "occupied_clusters": 3
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.8918918918918919,
+                      "best_cluster_purity": 0.9705882352941176,
+                      "occupied_clusters": 2
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.98,
+                      "best_cluster_purity": 0.901840490797546,
+                      "occupied_clusters": 2
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.8666666666666667,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 3
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.9935064935064936,
+                      "best_cluster_purity": 0.9272727272727272,
+                      "occupied_clusters": 2
+                    }
+                  }
+                },
+                {
+                  "seed": 2,
+                  "clusters": 8,
+                  "ari_to_annotations": 0.94050003843051,
+                  "nmi_to_annotations": 0.9181593545131201,
+                  "ari_to_exact_same_seed": 0.9863486537701897,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 1
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.975,
+                      "best_cluster_purity": 0.9831932773109243,
+                      "occupied_clusters": 3
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9807692307692307,
+                      "best_cluster_purity": 0.9807692307692307,
+                      "occupied_clusters": 4
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.8924050632911392,
+                      "best_cluster_purity": 0.9306930693069307,
+                      "occupied_clusters": 3
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.8918918918918919,
+                      "best_cluster_purity": 0.9705882352941176,
+                      "occupied_clusters": 2
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.98,
+                      "best_cluster_purity": 0.9130434782608695,
+                      "occupied_clusters": 2
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.8666666666666667,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 3
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.9935064935064936,
+                      "best_cluster_purity": 0.9272727272727272,
+                      "occupied_clusters": 2
+                    }
+                  }
+                }
+              ],
+              "within_graph_seed_ari": [
+                0.9679035345516227,
+                0.9848257930079009,
+                0.9743601371695187
+              ]
+            }
+          },
+          "pynndescent_umap": {
+            "weight_seconds": 0.005640708026476204,
+            "three_seed_cluster_seconds": 0.08408191695343703,
+            "graph": {
+              "edges_undirected": 34865,
+              "components": 1,
+              "largest_component_fraction": 1.0,
+              "isolated_cells": 0,
+              "by_type": {
+                "B cells": {
+                  "cells": 342,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.010195177404135003
+                },
+                "CD14+ Monocytes": {
+                  "cells": 480,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.04862717000523953
+                },
+                "CD4 T cells": {
+                  "cells": 1144,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.05477743408098046
+                },
+                "CD8 T cells": {
+                  "cells": 316,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.23407775763757144
+                },
+                "Dendritic cells": {
+                  "cells": 37,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.16272446665848916
+                },
+                "FCGR3A+ Monocytes": {
+                  "cells": 150,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.1501270825311044
+                },
+                "Megakaryocytes": {
+                  "cells": 15,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.12036235362904979
+                },
+                "NK cells": {
+                  "cells": 154,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.09924246668831305
+                }
+              }
+            },
+            "difference_to_exact": {
+              "edge_jaccard": 0.9196959682749505,
+              "relative_weight_l1": 0.060224805027246475,
+              "by_type_relative_weight_l1": {
+                "B cells": 0.02188820391893387,
+                "CD14+ Monocytes": 0.02204909920692444,
+                "CD4 T cells": 0.09936632215976715,
+                "CD8 T cells": 0.0648062527179718,
+                "Dendritic cells": 0.017166417092084885,
+                "FCGR3A+ Monocytes": 0.01183952484279871,
+                "Megakaryocytes": 0.007289578206837177,
+                "NK cells": 0.014350179582834244
+              }
+            },
+            "clustering": {
+              "seeds": [
+                {
+                  "seed": 0,
+                  "clusters": 8,
+                  "ari_to_annotations": 0.9381823785685314,
+                  "nmi_to_annotations": 0.9156892482594013,
+                  "ari_to_exact_same_seed": 0.9778647355959055,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 1
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.98125,
+                      "best_cluster_purity": 0.9832985386221295,
+                      "occupied_clusters": 3
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9729020979020979,
+                      "best_cluster_purity": 0.9849557522123894,
+                      "occupied_clusters": 4
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.9082278481012658,
+                      "best_cluster_purity": 0.9288025889967637,
+                      "occupied_clusters": 3
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.8918918918918919,
+                      "best_cluster_purity": 0.9705882352941176,
+                      "occupied_clusters": 2
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.98,
+                      "best_cluster_purity": 0.8855421686746988,
+                      "occupied_clusters": 2
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.8666666666666667,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 3
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.9935064935064936,
+                      "best_cluster_purity": 0.9272727272727272,
+                      "occupied_clusters": 2
+                    }
+                  }
+                },
+                {
+                  "seed": 1,
+                  "clusters": 8,
+                  "ari_to_annotations": 0.9402285132912459,
+                  "nmi_to_annotations": 0.9196329980757553,
+                  "ari_to_exact_same_seed": 0.9819154013485167,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 1
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.9854166666666667,
+                      "best_cluster_purity": 0.9833679833679834,
+                      "occupied_clusters": 3
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9755244755244755,
+                      "best_cluster_purity": 0.9841269841269841,
+                      "occupied_clusters": 4
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.9050632911392406,
+                      "best_cluster_purity": 0.910828025477707,
+                      "occupied_clusters": 3
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.8918918918918919,
+                      "best_cluster_purity": 0.9705882352941176,
+                      "occupied_clusters": 2
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.98,
+                      "best_cluster_purity": 0.9423076923076923,
+                      "occupied_clusters": 2
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.8666666666666667,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 3
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.987012987012987,
+                      "best_cluster_purity": 0.926829268292683,
+                      "occupied_clusters": 2
+                    }
+                  }
+                },
+                {
+                  "seed": 2,
+                  "clusters": 8,
+                  "ari_to_annotations": 0.9418462125879211,
+                  "nmi_to_annotations": 0.9197583865570934,
+                  "ari_to_exact_same_seed": 0.9878685403534926,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 1
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.9770833333333333,
+                      "best_cluster_purity": 0.9832285115303984,
+                      "occupied_clusters": 3
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9781468531468531,
+                      "best_cluster_purity": 0.9841688654353562,
+                      "occupied_clusters": 4
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.9050632911392406,
+                      "best_cluster_purity": 0.9225806451612903,
+                      "occupied_clusters": 3
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.8918918918918919,
+                      "best_cluster_purity": 0.9705882352941176,
+                      "occupied_clusters": 2
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.98,
+                      "best_cluster_purity": 0.91875,
+                      "occupied_clusters": 2
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.8666666666666667,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 3
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.9935064935064936,
+                      "best_cluster_purity": 0.9272727272727272,
+                      "occupied_clusters": 2
+                    }
+                  }
+                }
+              ],
+              "within_graph_seed_ari": [
+                0.9673603622533463,
+                0.9793978005138123,
+                0.9858225845314706
+              ]
+            }
+          },
+          "sklearn_union": {
+            "weight_seconds": 0.0010860000038519502,
+            "three_seed_cluster_seconds": 0.07872754102572799,
+            "graph": {
+              "edges_undirected": 34843,
+              "components": 1,
+              "largest_component_fraction": 1.0,
+              "isolated_cells": 0,
+              "by_type": {
+                "B cells": {
+                  "cells": 342,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.017355008787346193
+                },
+                "CD14+ Monocytes": {
+                  "cells": 480,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.0583268178264269
+                },
+                "CD4 T cells": {
+                  "cells": 1144,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.0691944338056939
+                },
+                "CD8 T cells": {
+                  "cells": 316,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.2907595549104983
+                },
+                "Dendritic cells": {
+                  "cells": 37,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.2535211267605634
+                },
+                "FCGR3A+ Monocytes": {
+                  "cells": 150,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.1841359773371105
+                },
+                "Megakaryocytes": {
+                  "cells": 15,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.25384615384615383
+                },
+                "NK cells": {
+                  "cells": 154,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.133261105092091
+                }
+              }
+            },
+            "difference_to_exact": {
+              "edge_jaccard": 1.0,
+              "relative_weight_l1": 2.5428619384765625,
+              "by_type_relative_weight_l1": {
+                "B cells": 2.5354061126708984,
+                "CD14+ Monocytes": 2.5154354572296143,
+                "CD4 T cells": 2.5929059982299805,
+                "CD8 T cells": 2.5947000980377197,
+                "Dendritic cells": 2.0060312747955322,
+                "FCGR3A+ Monocytes": 2.4257447719573975,
+                "Megakaryocytes": 2.013561964035034,
+                "NK cells": 2.410299777984619
+              }
+            },
+            "clustering": {
+              "seeds": [
+                {
+                  "seed": 0,
+                  "clusters": 6,
+                  "ari_to_annotations": 0.9075030209554917,
+                  "nmi_to_annotations": 0.8829242297409089,
+                  "ari_to_exact_same_seed": 0.9219472673022551,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 0.9970760233918129,
+                      "best_cluster_purity": 0.9884057971014493,
+                      "occupied_clusters": 2
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.9708333333333333,
+                      "best_cluster_purity": 0.985200845665962,
+                      "occupied_clusters": 2
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9877622377622378,
+                      "best_cluster_purity": 0.9724612736660929,
+                      "occupied_clusters": 4
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.9050632911392406,
+                      "best_cluster_purity": 0.6341463414634146,
+                      "occupied_clusters": 2
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.7027027027027027,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 4
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 0.8287292817679558,
+                      "occupied_clusters": 1
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 0.08287292817679558,
+                      "occupied_clusters": 1
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 0.34146341463414637,
+                      "occupied_clusters": 1
+                    }
+                  }
+                },
+                {
+                  "seed": 1,
+                  "clusters": 6,
+                  "ari_to_annotations": 0.9075030209554917,
+                  "nmi_to_annotations": 0.8829242297409089,
+                  "ari_to_exact_same_seed": 0.9158532274338664,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 0.9970760233918129,
+                      "best_cluster_purity": 0.9884057971014493,
+                      "occupied_clusters": 2
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.9708333333333333,
+                      "best_cluster_purity": 0.985200845665962,
+                      "occupied_clusters": 2
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9877622377622378,
+                      "best_cluster_purity": 0.9724612736660929,
+                      "occupied_clusters": 4
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.9050632911392406,
+                      "best_cluster_purity": 0.6341463414634146,
+                      "occupied_clusters": 2
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.7027027027027027,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 4
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 0.8287292817679558,
+                      "occupied_clusters": 1
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 0.08287292817679558,
+                      "occupied_clusters": 1
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 0.34146341463414637,
+                      "occupied_clusters": 1
+                    }
+                  }
+                },
+                {
+                  "seed": 2,
+                  "clusters": 6,
+                  "ari_to_annotations": 0.9057617084254247,
+                  "nmi_to_annotations": 0.8815688957512988,
+                  "ari_to_exact_same_seed": 0.9181138344679305,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 0.9970760233918129,
+                      "best_cluster_purity": 0.9884057971014493,
+                      "occupied_clusters": 2
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.9708333333333333,
+                      "best_cluster_purity": 0.985200845665962,
+                      "occupied_clusters": 2
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9877622377622378,
+                      "best_cluster_purity": 0.9707903780068728,
+                      "occupied_clusters": 4
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.8987341772151899,
+                      "best_cluster_purity": 0.6325167037861915,
+                      "occupied_clusters": 2
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.7027027027027027,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 4
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 0.8287292817679558,
+                      "occupied_clusters": 1
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 0.08287292817679558,
+                      "occupied_clusters": 1
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 0.3429844097995546,
+                      "occupied_clusters": 1
+                    }
+                  }
+                }
+              ],
+              "within_graph_seed_ari": [
+                1.0,
+                0.9976885401171173,
+                0.9976885401171173
+              ]
+            }
+          },
+          "sklearn_mutual": {
+            "weight_seconds": 0.0011287500383332372,
+            "three_seed_cluster_seconds": 0.03943416697438806,
+            "graph": {
+              "edges_undirected": 4727,
+              "components": 714,
+              "largest_component_fraction": 0.6895375284306292,
+              "isolated_cells": 645,
+              "by_type": {
+                "B cells": {
+                  "cells": 342,
+                  "internal_components": 102,
+                  "internal_isolated": 89,
+                  "internal_largest_fraction": 0.6549707602339181,
+                  "cross_type_weight_fraction": 0.0035714285714285587
+                },
+                "CD14+ Monocytes": {
+                  "cells": 480,
+                  "internal_components": 131,
+                  "internal_isolated": 112,
+                  "internal_largest_fraction": 0.6770833333333334,
+                  "cross_type_weight_fraction": 0.0488069414316703
+                },
+                "CD4 T cells": {
+                  "cells": 1144,
+                  "internal_components": 390,
+                  "internal_isolated": 356,
+                  "internal_largest_fraction": 0.6188811188811189,
+                  "cross_type_weight_fraction": 0.03707544723878664
+                },
+                "CD8 T cells": {
+                  "cells": 316,
+                  "internal_components": 98,
+                  "internal_isolated": 83,
+                  "internal_largest_fraction": 0.6329113924050633,
+                  "cross_type_weight_fraction": 0.22686945500633715
+                },
+                "Dendritic cells": {
+                  "cells": 37,
+                  "internal_components": 3,
+                  "internal_isolated": 2,
+                  "internal_largest_fraction": 0.9459459459459459,
+                  "cross_type_weight_fraction": 0.02985074626865669
+                },
+                "FCGR3A+ Monocytes": {
+                  "cells": 150,
+                  "internal_components": 25,
+                  "internal_isolated": 22,
+                  "internal_largest_fraction": 0.8266666666666667,
+                  "cross_type_weight_fraction": 0.10709677419354835
+                },
+                "Megakaryocytes": {
+                  "cells": 15,
+                  "internal_components": 3,
+                  "internal_isolated": 2,
+                  "internal_largest_fraction": 0.8666666666666667,
+                  "cross_type_weight_fraction": 0.015625
+                },
+                "NK cells": {
+                  "cells": 154,
+                  "internal_components": 27,
+                  "internal_isolated": 24,
+                  "internal_largest_fraction": 0.8116883116883117,
+                  "cross_type_weight_fraction": 0.0638930163447251
+                }
+              }
+            },
+            "difference_to_exact": {
+              "edge_jaccard": 0.1356657004276325,
+              "relative_weight_l1": 0.9306482672691345,
+              "by_type_relative_weight_l1": {
+                "B cells": 0.949013888835907,
+                "CD14+ Monocytes": 0.9278120994567871,
+                "CD4 T cells": 0.9365466833114624,
+                "CD8 T cells": 0.9225283265113831,
+                "Dendritic cells": 0.9279592037200928,
+                "FCGR3A+ Monocytes": 0.9170418977737427,
+                "Megakaryocytes": 0.8487139344215393,
+                "NK cells": 0.8863018155097961
+              }
+            },
+            "clustering": {
+              "seeds": [
+                {
+                  "seed": 0,
+                  "clusters": 733,
+                  "ari_to_annotations": 0.2712551513622196,
+                  "nmi_to_annotations": 0.49391935746542504,
+                  "ari_to_exact_same_seed": 0.285353128229232,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 0.6169590643274854,
+                      "best_cluster_purity": 0.9952830188679245,
+                      "occupied_clusters": 104
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.5541666666666667,
+                      "best_cluster_purity": 0.9962546816479401,
+                      "occupied_clusters": 129
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.3784965034965035,
+                      "best_cluster_purity": 0.9708520179372198,
+                      "occupied_clusters": 384
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.48417721518987344,
+                      "best_cluster_purity": 0.884393063583815,
+                      "occupied_clusters": 82
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.918918918918919,
+                      "best_cluster_purity": 0.8717948717948718,
+                      "occupied_clusters": 4
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.84,
+                      "best_cluster_purity": 0.7,
+                      "occupied_clusters": 23
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.8666666666666667,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 3
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.8116883116883117,
+                      "best_cluster_purity": 0.78125,
+                      "occupied_clusters": 27
+                    }
+                  }
+                },
+                {
+                  "seed": 1,
+                  "clusters": 733,
+                  "ari_to_annotations": 0.23865075819425036,
+                  "nmi_to_annotations": 0.49201844598237665,
+                  "ari_to_exact_same_seed": 0.25221924369718257,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 0.5818713450292398,
+                      "best_cluster_purity": 0.995,
+                      "occupied_clusters": 104
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.6083333333333333,
+                      "best_cluster_purity": 0.9931972789115646,
+                      "occupied_clusters": 129
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.26486013986013984,
+                      "best_cluster_purity": 0.9588607594936709,
+                      "occupied_clusters": 384
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.49050632911392406,
+                      "best_cluster_purity": 0.8757062146892656,
+                      "occupied_clusters": 81
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.918918918918919,
+                      "best_cluster_purity": 0.8947368421052632,
+                      "occupied_clusters": 4
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.8333333333333334,
+                      "best_cluster_purity": 0.8064516129032258,
+                      "occupied_clusters": 24
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.8666666666666667,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 3
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.8116883116883117,
+                      "best_cluster_purity": 0.78125,
+                      "occupied_clusters": 27
+                    }
+                  }
+                },
+                {
+                  "seed": 2,
+                  "clusters": 732,
+                  "ari_to_annotations": 0.25999569978670106,
+                  "nmi_to_annotations": 0.4949835736655816,
+                  "ari_to_exact_same_seed": 0.27196619413016376,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 0.5847953216374269,
+                      "best_cluster_purity": 0.9950248756218906,
+                      "occupied_clusters": 104
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.6020833333333333,
+                      "best_cluster_purity": 0.996551724137931,
+                      "occupied_clusters": 129
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.3479020979020979,
+                      "best_cluster_purity": 0.9778869778869779,
+                      "occupied_clusters": 383
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.5126582278481012,
+                      "best_cluster_purity": 0.8901098901098901,
+                      "occupied_clusters": 82
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.918918918918919,
+                      "best_cluster_purity": 0.8947368421052632,
+                      "occupied_clusters": 4
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.84,
+                      "best_cluster_purity": 0.7974683544303798,
+                      "occupied_clusters": 23
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.8666666666666667,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 3
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.8116883116883117,
+                      "best_cluster_purity": 0.8278145695364238,
+                      "occupied_clusters": 27
+                    }
+                  }
+                }
+              ],
+              "within_graph_seed_ari": [
+                0.7228079062326983,
+                0.8358102272398655,
+                0.748935730510506
+              ]
+            }
+          },
+          "sklearn_snn": {
+            "weight_seconds": 0.017662832979112864,
+            "three_seed_cluster_seconds": 0.07724808296188712,
+            "graph": {
+              "edges_undirected": 31867,
+              "components": 1,
+              "largest_component_fraction": 1.0,
+              "isolated_cells": 0,
+              "by_type": {
+                "B cells": {
+                  "cells": 342,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.004225927776103422
+                },
+                "CD14+ Monocytes": {
+                  "cells": 480,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.04149970297779704
+                },
+                "CD4 T cells": {
+                  "cells": 1144,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.04793488618052477
+                },
+                "CD8 T cells": {
+                  "cells": 316,
+                  "internal_components": 2,
+                  "internal_isolated": 1,
+                  "internal_largest_fraction": 0.9968354430379747,
+                  "cross_type_weight_fraction": 0.19289399616737313
+                },
+                "Dendritic cells": {
+                  "cells": 37,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.06979152666129662
+                },
+                "FCGR3A+ Monocytes": {
+                  "cells": 150,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.12292368803204567
+                },
+                "Megakaryocytes": {
+                  "cells": 15,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.027709382469317645
+                },
+                "NK cells": {
+                  "cells": 154,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.06158234874078161
+                }
+              }
+            },
+            "difference_to_exact": {
+              "edge_jaccard": 0.9145882960709468,
+              "relative_weight_l1": 0.7200090289115906,
+              "by_type_relative_weight_l1": {
+                "B cells": 0.6331150531768799,
+                "CD14+ Monocytes": 0.6867434978485107,
+                "CD4 T cells": 0.7664376497268677,
+                "CD8 T cells": 0.7435000538825989,
+                "Dendritic cells": 0.696825385093689,
+                "FCGR3A+ Monocytes": 0.6702832579612732,
+                "Megakaryocytes": 0.7568850517272949,
+                "NK cells": 0.6640433073043823
+              }
+            },
+            "clustering": {
+              "seeds": [
+                {
+                  "seed": 0,
+                  "clusters": 8,
+                  "ari_to_annotations": 0.9395227927791996,
+                  "nmi_to_annotations": 0.9197358081131852,
+                  "ari_to_exact_same_seed": 0.9487769400643898,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 0.9970845481049563,
+                      "occupied_clusters": 1
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.9666666666666667,
+                      "best_cluster_purity": 0.9935760171306209,
+                      "occupied_clusters": 3
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9868881118881119,
+                      "best_cluster_purity": 0.9732758620689655,
+                      "occupied_clusters": 3
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.8860759493670886,
+                      "best_cluster_purity": 0.9395973154362416,
+                      "occupied_clusters": 3
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.918918918918919,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 4
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.98,
+                      "best_cluster_purity": 0.9074074074074074,
+                      "occupied_clusters": 4
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 0.8823529411764706,
+                      "occupied_clusters": 1
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.974025974025974,
+                      "best_cluster_purity": 0.9554140127388535,
+                      "occupied_clusters": 2
+                    }
+                  }
+                },
+                {
+                  "seed": 1,
+                  "clusters": 8,
+                  "ari_to_annotations": 0.9407084370116874,
+                  "nmi_to_annotations": 0.9209602276296693,
+                  "ari_to_exact_same_seed": 0.9489698154523248,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 0.9970845481049563,
+                      "occupied_clusters": 1
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.9729166666666667,
+                      "best_cluster_purity": 0.9936170212765958,
+                      "occupied_clusters": 3
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9877622377622378,
+                      "best_cluster_purity": 0.9724612736660929,
+                      "occupied_clusters": 3
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.879746835443038,
+                      "best_cluster_purity": 0.9423728813559322,
+                      "occupied_clusters": 3
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.918918918918919,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 4
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.98,
+                      "best_cluster_purity": 0.9245283018867925,
+                      "occupied_clusters": 4
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.9333333333333333,
+                      "best_cluster_purity": 0.875,
+                      "occupied_clusters": 2
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.9805194805194806,
+                      "best_cluster_purity": 0.949685534591195,
+                      "occupied_clusters": 2
+                    }
+                  }
+                },
+                {
+                  "seed": 2,
+                  "clusters": 8,
+                  "ari_to_annotations": 0.939313771719326,
+                  "nmi_to_annotations": 0.9186970057427972,
+                  "ari_to_exact_same_seed": 0.9475534428837697,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 0.9970845481049563,
+                      "occupied_clusters": 1
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.9666666666666667,
+                      "best_cluster_purity": 0.9935760171306209,
+                      "occupied_clusters": 3
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9868881118881119,
+                      "best_cluster_purity": 0.9732758620689655,
+                      "occupied_clusters": 3
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.8829113924050633,
+                      "best_cluster_purity": 0.9393939393939394,
+                      "occupied_clusters": 3
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.918918918918919,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 4
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.98,
+                      "best_cluster_purity": 0.9074074074074074,
+                      "occupied_clusters": 4
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.9333333333333333,
+                      "best_cluster_purity": 0.875,
+                      "occupied_clusters": 2
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.9805194805194806,
+                      "best_cluster_purity": 0.949685534591195,
+                      "occupied_clusters": 2
+                    }
+                  }
+                }
+              ],
+              "within_graph_seed_ari": [
+                0.9955376313848313,
+                0.9990935882774392,
+                0.9964402189552848
+              ]
+            }
+          },
+          "sklearn_scanpy_jaccard": {
+            "weight_seconds": 0.007616540999151766,
+            "three_seed_cluster_seconds": 0.07390995905734599,
+            "graph": {
+              "edges_undirected": 31867,
+              "components": 1,
+              "largest_component_fraction": 1.0,
+              "isolated_cells": 0,
+              "by_type": {
+                "B cells": {
+                  "cells": 342,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.003738746361096612
+                },
+                "CD14+ Monocytes": {
+                  "cells": 480,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.04114637512706265
+                },
+                "CD4 T cells": {
+                  "cells": 1144,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.045330170315340146
+                },
+                "CD8 T cells": {
+                  "cells": 316,
+                  "internal_components": 2,
+                  "internal_isolated": 1,
+                  "internal_largest_fraction": 0.9968354430379747,
+                  "cross_type_weight_fraction": 0.18913716212739018
+                },
+                "Dendritic cells": {
+                  "cells": 37,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.04725058074252053
+                },
+                "FCGR3A+ Monocytes": {
+                  "cells": 150,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.11463698358239649
+                },
+                "Megakaryocytes": {
+                  "cells": 15,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.017528827411953718
+                },
+                "NK cells": {
+                  "cells": 154,
+                  "internal_components": 1,
+                  "internal_isolated": 0,
+                  "internal_largest_fraction": 1.0,
+                  "cross_type_weight_fraction": 0.05864039690671241
+                }
+              }
+            },
+            "difference_to_exact": {
+              "edge_jaccard": 0.9145882960709468,
+              "relative_weight_l1": 0.7960496387618745,
+              "by_type_relative_weight_l1": {
+                "B cells": 0.7002483082249461,
+                "CD14+ Monocytes": 0.7672750951484145,
+                "CD4 T cells": 0.8474078365558383,
+                "CD8 T cells": 0.8285999905813078,
+                "Dendritic cells": 0.6564196979351282,
+                "FCGR3A+ Monocytes": 0.7404998399346426,
+                "Megakaryocytes": 0.6604607762169852,
+                "NK cells": 0.7319153145130349
+              }
+            },
+            "clustering": {
+              "seeds": [
+                {
+                  "seed": 0,
+                  "clusters": 8,
+                  "ari_to_annotations": 0.9427056834119993,
+                  "nmi_to_annotations": 0.9226765287014137,
+                  "ari_to_exact_same_seed": 0.9503717096511917,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 1
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.9625,
+                      "best_cluster_purity": 0.9935483870967742,
+                      "occupied_clusters": 3
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9886363636363636,
+                      "best_cluster_purity": 0.975,
+                      "occupied_clusters": 3
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.8892405063291139,
+                      "best_cluster_purity": 0.9429530201342282,
+                      "occupied_clusters": 3
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.9459459459459459,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 3
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.9866666666666667,
+                      "best_cluster_purity": 0.896969696969697,
+                      "occupied_clusters": 3
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.9333333333333333,
+                      "best_cluster_purity": 0.875,
+                      "occupied_clusters": 2
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.974025974025974,
+                      "best_cluster_purity": 0.9554140127388535,
+                      "occupied_clusters": 2
+                    }
+                  }
+                },
+                {
+                  "seed": 1,
+                  "clusters": 8,
+                  "ari_to_annotations": 0.9436022395425411,
+                  "nmi_to_annotations": 0.923997901598704,
+                  "ari_to_exact_same_seed": 0.9462479383091349,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 1
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.9666666666666667,
+                      "best_cluster_purity": 0.9935760171306209,
+                      "occupied_clusters": 3
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9886363636363636,
+                      "best_cluster_purity": 0.975,
+                      "occupied_clusters": 3
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.8892405063291139,
+                      "best_cluster_purity": 0.9429530201342282,
+                      "occupied_clusters": 3
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.9459459459459459,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 3
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.9866666666666667,
+                      "best_cluster_purity": 0.9079754601226994,
+                      "occupied_clusters": 3
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.9333333333333333,
+                      "best_cluster_purity": 0.875,
+                      "occupied_clusters": 2
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.974025974025974,
+                      "best_cluster_purity": 0.9554140127388535,
+                      "occupied_clusters": 2
+                    }
+                  }
+                },
+                {
+                  "seed": 2,
+                  "clusters": 8,
+                  "ari_to_annotations": 0.943588633946152,
+                  "nmi_to_annotations": 0.9238951259909407,
+                  "ari_to_exact_same_seed": 0.9476321280537732,
+                  "by_type": {
+                    "B cells": {
+                      "best_cluster_completeness": 1.0,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 1
+                    },
+                    "CD14+ Monocytes": {
+                      "best_cluster_completeness": 0.9666666666666667,
+                      "best_cluster_purity": 0.9935760171306209,
+                      "occupied_clusters": 3
+                    },
+                    "CD4 T cells": {
+                      "best_cluster_completeness": 0.9886363636363636,
+                      "best_cluster_purity": 0.975,
+                      "occupied_clusters": 3
+                    },
+                    "CD8 T cells": {
+                      "best_cluster_completeness": 0.8924050632911392,
+                      "best_cluster_purity": 0.94,
+                      "occupied_clusters": 3
+                    },
+                    "Dendritic cells": {
+                      "best_cluster_completeness": 0.9459459459459459,
+                      "best_cluster_purity": 1.0,
+                      "occupied_clusters": 3
+                    },
+                    "FCGR3A+ Monocytes": {
+                      "best_cluster_completeness": 0.9866666666666667,
+                      "best_cluster_purity": 0.9079754601226994,
+                      "occupied_clusters": 3
+                    },
+                    "Megakaryocytes": {
+                      "best_cluster_completeness": 0.9333333333333333,
+                      "best_cluster_purity": 0.875,
+                      "occupied_clusters": 2
+                    },
+                    "NK cells": {
+                      "best_cluster_completeness": 0.9675324675324676,
+                      "best_cluster_purity": 0.9612903225806452,
+                      "occupied_clusters": 2
+                    }
+                  }
+                }
+              ],
+              "within_graph_seed_ari": [
+                0.999065000843343,
+                0.9983907143253408,
+                0.9993257629976615
+              ]
+            }
+          }
+        }
+      },
+      "exact_disagreement_audit": {
+        "disagreeing_rows": 0,
+        "checked_all_disagreeing_rows": true,
+        "faiss_oracle_mismatch_rows": 0,
+        "sklearn_oracle_mismatch_rows": 0,
+        "records": []
+      }
+    }
+  }
+}

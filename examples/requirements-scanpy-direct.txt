@@ -1,0 +1,9 @@
+# Main analysis libraries used for the recorded Python 3.12 example.
+# Transitive dependencies are resolved by pip; summary.json records versions.
+maturin>=1.5,<2
+numpy==2.4.6
+scipy==1.16.3
+scikit-learn==1.9.0
+scanpy==1.12.2
+anndata==0.12.10
+igraph==1.0.0

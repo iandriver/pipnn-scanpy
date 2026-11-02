@@ -33,18 +33,33 @@ __all__ = ["PiPNNTransformer"]
 
 
 class PiPNNTransformer(TransformerMixin, BaseEstimator):
-    """k-NN transformer using the PiPNN graph index.
+    """k-NN transformer using a PiPNN index or direct graph construction.
 
     Parameters
     ----------
     n_neighbors : int
-        Number of neighbors per point (excluding the self edge), matching
-        scanpy's ``n_neighbors``.
+        Number of nonself neighbors, following sklearn's transformer contract.
+        The returned CSR stores these plus the explicit self edge. Scanpy uses
+        a self-inclusive count when consuming this graph; see the public example.
     metric : {"euclidean", "cosine"}
         Distance metric. ``"euclidean"`` (default) matches scanpy on PCA space.
     m, l_max, R, alpha, beam_L, fanout, c_min, c_max :
         PiPNN build/search hyperparameters (see the paper); defaults follow the
         paper's recommendations.
+    algorithm : {"index", "direct"}, default="index"
+        ``"index"`` preserves the existing build-and-self-query path.
+        Experimental ``"direct"`` merges neighbors from overlapping partitions
+        without building or searching a navigation index. It uses ``fanout``,
+        ``c_max`` and ``runs``; ``m``, ``l_max``, ``R``, ``alpha``, ``beam_L``
+        and ``c_min`` have no effect in this mode.
+    kernel : {"dense", "fused"}, default="dense"
+        Direct-mode distance scorer. ``"dense"`` uses matrix multiplication;
+        ``"fused"`` selects candidates while computing distances, avoiding a
+        full leaf distance matrix. Fused can save memory at a runtime cost.
+        ``"fused"`` requires ``algorithm="direct"``.
+    runs : int
+        Independent partition passes. More passes can improve direct-mode
+        recall at additional construction cost.
     n_jobs : int
         Thread count for the Rust build (``-1`` / ``0`` = all cores).
     random_state : int
@@ -68,6 +83,8 @@ class PiPNNTransformer(TransformerMixin, BaseEstimator):
         runs: int = 1,
         n_jobs: int = -1,
         random_state: int = 0,
+        algorithm: str = "index",
+        kernel: str = "dense",
     ):
         # sklearn contract: __init__ only stores args verbatim, no validation.
         self.n_neighbors = n_neighbors
@@ -83,10 +100,18 @@ class PiPNNTransformer(TransformerMixin, BaseEstimator):
         self.runs = runs
         self.n_jobs = n_jobs
         self.random_state = random_state
+        self.algorithm = algorithm
+        self.kernel = kernel
 
     # -- sklearn estimator API -------------------------------------------------
 
     def fit(self, X, y=None):
+        if self.algorithm not in ("index", "direct"):
+            raise ValueError("algorithm must be 'index' or 'direct'")
+        if self.kernel not in ("dense", "fused"):
+            raise ValueError("kernel must be 'dense' or 'fused'")
+        if self.algorithm == "index" and self.kernel != "dense":
+            raise ValueError("kernel='fused' requires algorithm='direct'")
         X = check_array(X, dtype=np.float32, accept_sparse=False, order="C")
         n = X.shape[0]
         if self.n_neighbors >= n:
@@ -95,22 +120,29 @@ class PiPNNTransformer(TransformerMixin, BaseEstimator):
             )
 
         n_jobs = 0 if self.n_jobs in (None, -1) else int(self.n_jobs)
-        indices, distances, stride = _pipnn.build_and_self_knn(
-            X,
-            int(self.n_neighbors),
-            str(self.metric),
-            int(self.m),
-            int(self.l_max),
-            int(self.R),
-            float(self.alpha),
-            int(self.beam_L),
-            int(self.fanout),
-            int(self.c_min),
-            int(self.c_max),
-            int(self.runs),
-            int(n_jobs),
-            int(self.random_state),
-        )
+        if self.algorithm == "direct":
+            indices, distances, stride = _pipnn.build_direct_knn(
+                X, int(self.n_neighbors), str(self.metric), int(self.fanout),
+                int(self.c_max), int(self.runs), n_jobs, int(self.random_state),
+                str(self.kernel),
+            )
+        else:
+            indices, distances, stride = _pipnn.build_and_self_knn(
+                X,
+                int(self.n_neighbors),
+                str(self.metric),
+                int(self.m),
+                int(self.l_max),
+                int(self.R),
+                float(self.alpha),
+                int(self.beam_L),
+                int(self.fanout),
+                int(self.c_min),
+                int(self.c_max),
+                int(self.runs),
+                int(n_jobs),
+                int(self.random_state),
+            )
 
         self._indices = indices
         self._distances = distances

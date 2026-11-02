@@ -12,8 +12,41 @@ use pyo3::prelude::*;
 use pipnn_core::{
     build_index, build_index_with_cands, knn_query, knn_self_bruteforce, knn_self_graph,
     knn_self_hnsw, knn_self_reservoir, BuildParams, Dataset, HnswParams, Metric, Quant,
-    SearchParams,
+    SearchParams, knn_self_direct_with_kernel,
 };
+
+/// Direct construction, with the same self-first array layout as self-search.
+#[pyfunction]
+#[pyo3(signature = (x, n_neighbors=15, metric="euclidean", fanout=2, c_max=2048, runs=1, n_jobs=0, seed=0, kernel="dense"))]
+fn build_direct_knn<'py>(
+    py: Python<'py>, x: PyReadonlyArray2<'py, f32>, n_neighbors: usize,
+    metric: &str, fanout: usize, c_max: usize, runs: usize, n_jobs: usize, seed: u64, kernel: &str,
+) -> PyResult<(Bound<'py, PyArray1<u32>>, Bound<'py, PyArray1<f32>>, usize)> {
+    let metric = Metric::parse(metric)
+        .ok_or_else(|| PyValueError::new_err("unsupported metric"))?;
+    let arr = x.as_array();
+    let (n, d) = (arr.shape()[0], arr.shape()[1]);
+    if n == 0 || d == 0 || n_neighbors >= n || fanout == 0 || c_max < 2 || runs == 0 {
+        return Err(PyValueError::new_err("require n > k, d > 0, fanout/runs > 0, c_max >= 2"));
+    }
+    let flat = x.as_slice().map_err(|_| PyValueError::new_err("require C-contiguous float32 input"))?;
+    if flat.iter().any(|v| !v.is_finite()) {
+        return Err(PyValueError::new_err("input must be finite"));
+    }
+    let bp = BuildParams { metric, fanout, c_max, runs, seed, ..BuildParams::default() };
+    let fused = match kernel {
+        "dense" => false,
+        "fused" => true,
+        _ => return Err(PyValueError::new_err("kernel must be 'dense' or 'fused'")),
+    };
+    let pool = rayon::ThreadPoolBuilder::new().num_threads(n_jobs).build()
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    let out = py.detach(|| pool.install(|| {
+        let data = Dataset::new(flat, n, d, metric);
+        knn_self_direct_with_kernel(&data, &bp, n_neighbors, fused)
+    }));
+    Ok((out.indices.into_pyarray(py), out.distances.into_pyarray(py), out.stride))
+}
 
 /// Build the index and return self-kNN as flat arrays.
 ///
@@ -438,6 +471,7 @@ impl PiPNNIndex {
 
 #[pymodule]
 fn _pipnn(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(build_direct_knn, m)?)?;
     m.add_function(wrap_pyfunction!(build_and_self_knn, m)?)?;
     m.add_function(wrap_pyfunction!(build_and_query, m)?)?;
     m.add_function(wrap_pyfunction!(hnsw_self_knn, m)?)?;
