@@ -9,7 +9,28 @@ import numpy as np
 
 from . import _pipnn
 
-__all__ = ["self_knn_graph", "query_knn", "PiPNNIndex"]
+__all__ = ["self_knn_graph", "direct_knn_graph", "query_knn", "PiPNNIndex"]
+
+
+def direct_knn_graph(X, n_neighbors=15, *, metric="euclidean", fanout=2,
+                     c_max=2048, runs=1, n_jobs=-1, random_state=0, kernel="dense"):
+    """Experimental direct k-NN graph; no navigable index or self-search.
+
+    Returns (indices, distances), with shape (n, k+1), self first. More
+    partition passes or overlap can improve recall, at additional build cost.
+    Distances use original float vectors. Underfilled rows are completed by
+    exact search (PIPNN_PROFILE=1 reports their count).
+    kernel="fused" scores and selects candidates without a leaf distance matrix;
+    "dense" preserves the original matrix-multiply scorer.
+    """
+    X = np.ascontiguousarray(X, dtype=np.float32)
+    if X.ndim != 2:
+        raise ValueError("X must be a two-dimensional matrix")
+    jobs = 0 if n_jobs in (None, -1) else int(n_jobs)
+    ids, distances, stride = _pipnn.build_direct_knn(
+        X, int(n_neighbors), str(metric), int(fanout), int(c_max),
+        int(runs), jobs, int(random_state), str(kernel))
+    return ids.reshape(len(X), stride), distances.reshape(len(X), stride)
 
 
 class PiPNNIndex:

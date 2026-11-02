@@ -1,0 +1,9 @@
+{
+  "python_tests": 67,
+  "rust_tests": 11,
+  "fresh_process_search_runs": 18,
+  "graph_matrices_checked": 10,
+  "public_dataset_only": true,
+  "all_seed_zero_repeats_return_same_ids": true,
+  "exact_implementations_disagreeing_rows": 0
+}

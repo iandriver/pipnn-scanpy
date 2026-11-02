@@ -19,8 +19,9 @@ sc.pp.neighbors(adata, n_neighbors=15, use_rep="X_pca",
 
 ```bash
 uv venv --python 3.12 .venv
+source .venv/bin/activate
 uv pip install --python .venv/bin/python maturin numpy scipy scikit-learn scanpy pynndescent pytest
-.venv/bin/maturin develop --release
+env -u CONDA_PREFIX .venv/bin/maturin develop --release
 .venv/bin/pytest tests/
 ```
 
@@ -471,3 +472,14 @@ read-only mmap views the others accept); one process per size keeps an OOM conta
 ## Metrics
 
 `euclidean` (default, matches scanpy on PCA space) and `cosine`.
+
+
+## Experimental direct mode and public reproduction
+
+The development branch adds `PiPNNTransformer(algorithm="direct", kernel="dense")`
+and optional `kernel="fused"`. The existing index path remains the default.
+
+[Run the public PBMC3k comparison](docs/exact_graph_public.md) to compare exact
+and approximate search, per-group recall, graph weighting, and Leiden seed
+variation. It uses public data only and requires a source build; these options
+are not part of the released v0.1.1 wheel.

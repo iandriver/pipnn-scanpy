@@ -9,6 +9,14 @@ import anndata as ad  # noqa: E402
 from pipnn import PiPNNTransformer  # noqa: E402
 
 
+@pytest.fixture(params=[{}, {"algorithm": "direct", "kernel": "dense"},
+                        {"algorithm": "direct", "kernel": "fused"}])
+def transformer(request):
+    # Force partitioning in direct mode rather than one full exact leaf.
+    return PiPNNTransformer(n_neighbors=15, c_max=128, runs=3,
+                            n_jobs=2, random_state=0, **request.param)
+
+
 @pytest.fixture
 def adata():
     rng = np.random.default_rng(0)
@@ -19,10 +27,10 @@ def adata():
     return a
 
 
-def test_neighbors_populates_obsp(adata):
+def test_neighbors_populates_obsp(adata, transformer):
     sc.pp.neighbors(
         adata, n_neighbors=15, use_rep="X_pca",
-        transformer=PiPNNTransformer(n_neighbors=15),
+        transformer=transformer,
     )
     assert "distances" in adata.obsp
     assert "connectivities" in adata.obsp
@@ -31,16 +39,21 @@ def test_neighbors_populates_obsp(adata):
     assert adata.obsp["distances"].shape == (n, n)
     assert adata.obsp["connectivities"].shape == (n, n)
     # connectivities should be a non-trivial symmetric-ish graph
-    assert adata.obsp["connectivities"].nnz > 0
+    graph = adata.obsp["connectivities"]
+    assert graph.nnz > 0
+    assert np.isfinite(graph.data).all()
+    assert np.isfinite(adata.obsp["distances"].data).all()
+    assert abs(graph - graph.T).max() < 1e-6
 
 
-def test_umap_and_leiden_run(adata):
+def test_umap_and_leiden_run(adata, transformer):
     sc.pp.neighbors(
         adata, n_neighbors=15, use_rep="X_pca",
-        transformer=PiPNNTransformer(n_neighbors=15),
+        transformer=transformer,
     )
-    sc.tl.umap(adata)
+    sc.tl.umap(adata, random_state=0)
     assert adata.obsm["X_umap"].shape == (adata.n_obs, 2)
+    assert np.isfinite(adata.obsm["X_umap"]).all()
 
     sc.tl.leiden(adata, flavor="igraph", n_iterations=2)
     n_clusters = adata.obs["leiden"].nunique()

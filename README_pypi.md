@@ -63,3 +63,11 @@ development notes and the comparison harness, are in the repository:
 **https://github.com/iandriver/pipnn-scanpy**
 
 MIT licensed.
+
+
+## Development example
+
+The repository's [public PBMC3k reproduction](https://github.com/iandriver/pipnn-scanpy/blob/codex/public-knn-reproduction/docs/exact_graph_public.md)
+compares exhaustive search with experimental direct PiPNN construction, then
+checks graph weighting and clustering. It requires building that source branch.
+Released v0.1.1 defaults are unchanged.

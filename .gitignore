@@ -28,3 +28,8 @@ docker/out/
 .DS_Store
 # Tahoe-100M dataset cache (parquet shards + PCA embedding, multi-GB)
 bench/tahoe_cache/
+
+# Local build dependencies and generated public benchmark outputs
+.build-deps/
+.test-deps/
+bench/results/public_knn/
